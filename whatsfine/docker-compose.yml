@@ -1,0 +1,32 @@
+# Local trial of stock Mealie, for clicking around before we fork anything.
+#
+#   docker compose -f whatsfine/docker-compose.yml up -d
+#   open http://localhost:9925
+#
+# Uses upstream's published image at the release this checkout tracks, so
+# nothing is built locally. Bump the tag after merging a newer upstream release.
+#
+# First sign-in uses upstream's default admin account, defined in
+# mealie/core/settings/settings.py (_DEFAULT_EMAIL / _DEFAULT_PASSWORD).
+# Mealie asks you to change it on first login.
+#
+# Data (SQLite, images, and the auto-generated .secret files) lives in the
+# named volume `mealie-local-data`. To start over from nothing:
+#   docker compose -f whatsfine/docker-compose.yml down -v
+services:
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:v3.29.0
+    container_name: mealie-local
+    restart: unless-stopped
+    ports:
+      - "9925:9000"
+    volumes:
+      - mealie-local-data:/app/data/
+    environment:
+      BASE_URL: http://localhost:9925
+      ALLOW_SIGNUP: "false"
+      TZ: America/New_York
+      DB_ENGINE: sqlite
+
+volumes:
+  mealie-local-data:
