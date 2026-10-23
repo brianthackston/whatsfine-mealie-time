@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  WhatsFine mark for Mealie: the site's "WF?" wordmark (theme.css .mk, with
+  the question mark in sun) on a forest tile. Square because Mealie shows the
+  logo in circles (app bar button, login avatar) and as the favicon; the tile
+  disappears into the forest app bar and leaves just the glyphs.
+
+  The text needs Bricolage Grotesque 800, which an <img> cannot load, so this
+  file is the SOURCE: build-logo.mjs fetches the font and renders mark.png.
+  Edit here, re-run the build, commit both.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#113939"/>
+  <text x="256" y="356" text-anchor="middle"
+        font-family="Bricolage Grotesque" font-weight="800" font-size="290"
+        letter-spacing="-8" fill="#fbf4e6">WF<tspan fill="#ffc22e">?</tspan></text>
+</svg>

@@ -22,6 +22,11 @@ services:
       - "9925:9000"
     volumes:
       - mealie-local-data:/app/data/
+      # The logo that brand/mealie.env points BRANDING_LOGO_PATH at.
+      - ./brand/mark.png:/app/brand/mark.png:ro
+    # WhatsFine name, logo and colours: all upstream settings, no code.
+    env_file:
+      - ./brand/mealie.env
     environment:
       BASE_URL: http://localhost:9925
       ALLOW_SIGNUP: "false"

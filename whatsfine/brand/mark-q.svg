@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Alternative mark: the question mark alone, for places where 40px is too
+     small for three glyphs. Same source/build arrangement as mark.svg. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#113939"/>
+  <text x="256" y="404" text-anchor="middle"
+        font-family="Bricolage Grotesque" font-weight="800" font-size="420"
+        fill="#ffc22e">?</text>
+</svg>

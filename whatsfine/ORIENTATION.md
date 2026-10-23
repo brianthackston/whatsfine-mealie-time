@@ -198,3 +198,116 @@ the fork's cost is the size of our diff. Keep that diff as small as possible:
   crew's recipe development, or something public-facing. That choice decides
   which recipe "owns" which, the hosting option, and whether we ever need to
   patch the code at all.
+
+## 7. Brand fit: what is done, and how
+
+Added 2026-10-22. Everything in this section is configuration and API calls;
+Mealie's code is untouched.
+
+### Look (`brand/`)
+
+`brand/mealie.env` sets `BRANDING_NAME=WhatsFine`, the logo, and all fourteen
+`THEME_*` colours from the site's tokens (`whatsfine/src/styles/tokens.css`).
+The compose file loads it and mounts the logo. Where each colour lands:
+
+| Mealie key | Light | Dark | Reaches |
+|---|---|---|---|
+| `primary` | forest `#113939` | forest-600 `#1b4f4c` | app bar, primary buttons, active nav, the logo avatar |
+| `accent` | tomato `#f0432b` | tomato | links, highlights, secondary buttons |
+| `secondary` | sun `#ffc22e` | sun | a few chips and toggles (Vuetify puts ink text on it) |
+| `success` / `info` / `warning` / `error` | the site's functional set | brighter pop variants | alerts, status chips |
+
+`brand/mark.svg` is the "WF?" wordmark (`.mk` on the site, question mark in
+sun) on a forest tile with the site's `--r-xl`-ish radius. Mealie shows the
+logo at 40px in the app bar, 75px on the login page, and as the favicon; the
+tile vanishes into the forest bar and leaves the glyphs. `mark-q` is the
+question mark alone, if three glyphs prove too small at 40px. Because Mealie
+serves the logo through `<img>`, the font can't be loaded at display time, so
+`build-logo.mjs` fetches Bricolage Grotesque (the same way the site's OG route
+does) and renders the committed PNGs. Edit the SVG, run `pnpm logo`, commit
+both.
+
+### Content (`seed/`)
+
+`seed/seed.mjs` turns every published article with a `recipe` field into a
+Mealie recipe through the API. It establishes the conventions Mealie will
+carry for WhatsFine content:
+
+| In Mealie | From WhatsFine | Why |
+|---|---|---|
+| Category **Food** | the article's `pillar` | pillars are the site's top-level sections |
+| Tags **WhatsFine**, **Recipe** | fixed source tag + the article's `kicker` | the source tag is what the cookbook filters on; the kicker is the site's own sub-type |
+| Cookbook **WhatsFine** (public) | `tags.name CONTAINS ALL ["WhatsFine"]` | one shareable page listing everything from the site |
+| Note "WhatsFine tip" | `recipe.note` | the card's one-line advice, kept as a note so it survives Mealie's step editing |
+| Note "Printable card" | `recipe.product` → `/shop/{slug}` | links the recipe to the shop item it came from |
+| `extras.whatsfine_article`, `extras.whatsfine_product` | slugs | machine-readable back-references for any later sync |
+| Recipe image | `/og.png?title=…&kicker=…&pillar=food` | the site already renders a branded card per article; real photos can replace it later via the recipe page |
+| `orgURL` | `/articles/{slug}` | Mealie shows it as the source link |
+
+Re-running is safe: existing recipes (matched by name) are skipped unless
+`--replace`. `--seed-foods` also runs Mealie's own en-US foods and units
+seeders, which a fresh group doesn't get on its own; do that once per group.
+The mapping in `toRecipeJsonLd()` is the schema.org shape the site should emit
+itself (task `cap-20261022-recipe-jsonld`); once it does, the script can
+import by URL and that function retires.
+
+**Not yet verified against a running Mealie** (Docker was down when this was
+built): the dry run produces the payloads under `seed/out/`, but the cookbook
+filter string and the multipart image upload need one real run.
+
+### Small patches worth carrying, if we want them
+
+Each is a few lines, and the first two are plausible upstream PRs, which is
+the cheapest way to carry a change.
+
+1. **Background colour.** `frontend/app/plugins/theme.ts` already lists
+   `background` among the theme variations, but `core/settings/themes.py` has
+   no `THEME_LIGHT_BACKGROUND` / `THEME_DARK_BACKGROUND`. Adding them (settings,
+   the `AppTheme` schema, codegen, theme.ts) would put Mealie on cream
+   `#fbf4e6` and forest-800 instead of Vuetify's white and near-black. That's
+   the single biggest visual step after the colours above.
+2. **Fonts.** Mealie uses Vuetify's Roboto. Bricolage Grotesque for headings
+   and Hanken Grotesk for body is a `nuxt.config.ts` font entry plus a short
+   CSS file. Not upstreamable as-is (upstream would want it configurable), so
+   this one is a fork-only patch, kept tiny.
+3. **Nothing else in the UI.** Copy lives in `frontend/app/lang/messages/`;
+   upstream permits edits to `en-US.json` only, and a voice pass there would be
+   a large, conflict-prone diff. Keep the copy stock.
+
+## 8. Ways to fold Mealie into the brand
+
+Suggestions only. Each is independent, and none is started.
+
+- **What to call it.** `BRANDING_NAME` is the app-bar title, so the instance
+  can carry a name of its own rather than the site's: *WhatsFine Kitchen*,
+  *The Fine Kitchen*, or plain *WhatsFine* (what `mealie.env` sets today).
+  Pair it with a subdomain: `kitchen.whatsfine.com` or `recipes.whatsfine.com`.
+- **Let the site point at it.** The cookbook is public, so the Food pillar page
+  (`/food`) can link "Cook along in the kitchen" to
+  `/g/home/cookbooks/whatsfine`, and each recipe article's card can link to its
+  Mealie page for the scaled-servings, shopping-list and meal-plan features the
+  site doesn't have. That is the cheapest two-way tie and needs no code in
+  Mealie.
+- **Make the OG card the house style for recipe images.** Mealie's recipe grid
+  is image-led; with the OG cards every WhatsFine recipe already reads as one
+  set. When real photography arrives, the forest/cream card can become the
+  fallback rather than the default.
+- **Cookbooks as capsules.** The site's `capsule` collection groups picks by
+  room; Mealie cookbooks are saved filters, so a cookbook per series (a
+  "Poor-kid food" book for the three gravies-and-treats, say) mirrors how the
+  site already curates.
+- **Tags that match the site's vocabulary.** Keep `kicker` values as Mealie
+  tags (`Recipe`, later `Snack`, `Breakfast`, whatever the site adopts) so a
+  tag on one side means the same on the other. Resist inventing a second
+  taxonomy in Mealie.
+- **Events back to the site.** An Apprise `jsons://` notifier on
+  `recipe_created` / `recipe_updated` hitting a whatsfine.com Worker endpoint
+  (section 4, item 3) lets a recipe written in Mealie's editor show up on the
+  site, or at least in the newsletter draft, without a second copy being typed.
+- **The question mark as the icon.** The brand's hook is the `?`; `mark-q`
+  makes a stronger favicon and phone home-screen icon than three glyphs.
+  Worth a side-by-side once it's running.
+- **Keep the palette closed.** Forest, cream, sun and tomato, with the pop
+  accents only where the site uses them. Don't add Vuetify's blues or greens
+  back for "contrast"; the functional colours in `mealie.env` already cover
+  success/info/warning/error in the site's own values.

@@ -1,0 +1,15 @@
+{
+  "name": "@whatsfine/mealie-tools",
+  "private": true,
+  "type": "module",
+  "description": "WhatsFine-side tooling for the Mealie fork: brand assets and seeding. Separate from upstream's frontend/ workspace on purpose.",
+  "scripts": {
+    "logo": "node brand/build-logo.mjs",
+    "seed": "node seed/seed.mjs",
+    "seed:dry": "node seed/seed.mjs --dry-run"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  },
+  "packageManager": "pnpm@11.25.0"
+}
