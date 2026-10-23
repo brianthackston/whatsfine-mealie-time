@@ -163,7 +163,8 @@ the fork's cost is the size of our diff. Keep that diff as small as possible:
 
 - **Remotes:** `upstream` is `mealie-recipes/mealie` (default branch
   `mealie-next`); `origin` is our fork, `brianthackston/whatsfine-mealie-time`,
-  created 2026-10-22 with `--default-branch-only`.
+  created 2026-10-22 with `--default-branch-only`. Its default branch is
+  `whatsfine`.
 - **Branches:** leave `mealie-next` as a pure mirror of upstream. Our work is on
   the `whatsfine` branch, which merges (not rebases) upstream after each release
   tag, so the merge history records which release we're on.
