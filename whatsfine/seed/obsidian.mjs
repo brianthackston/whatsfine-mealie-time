@@ -19,7 +19,7 @@
 //   tools: [..]                → Mealie tools
 //   mealie id:                 written by this script after a push
 //   ---
-//   ## Immediate Thoughts      → a Mealie note, when non-empty
+//   ## Immediate Thoughts      stays in the vault (drafting scratch; Mealie notes get published)
 //   ## Ingredients             - one per line → ingredients (parsed to qty/unit/food)
 //   ## Instructions            1. one per line → steps
 //   ## Notes                   - bullets → one Mealie note
@@ -149,7 +149,9 @@ export async function readNote(path) {
 export function noteToJsonLd(note) {
 	const d = note.data;
 	const source = d.source ?? undefined;
-	const keywords = [...list(d.cuisine)];
+	// The site's sync reads the first tag that isn't WhatsFine as the page's
+	// kicker chip, so "Recipe" goes first and cuisines follow.
+	const keywords = ["Recipe", ...list(d.cuisine)];
 	if (source && /whatsfine\.com/i.test(source)) keywords.unshift(SOURCE_TAG);
 	return compact({
 		"@context": "https://schema.org",
@@ -173,9 +175,10 @@ const tagline = (note) => (note.sections["image and tagline"] ?? "").split(/\n\s
 /** Everything schema.org has no slot for; organizers are resolved to objects by the caller. */
 export function noteToPatch(note, { tools = [], categories = [], tags = [] } = {}) {
 	const d = note.data;
+	// "Immediate Thoughts" stays in the vault: it is drafting scratch, and
+	// every Mealie note on a WhatsFine recipe is published to /food by the
+	// site's sync (whatsfine/docs/mealie-sync.md).
 	const notes = [];
-	const thoughts = note.sections["immediate thoughts"];
-	if (thoughts) notes.push({ title: "Immediate thoughts", text: thoughts });
 	const noteLines = bullets(note.sections.notes);
 	if (noteLines.length) notes.push({ title: "Notes", text: noteLines.map((l) => `- ${l}`).join("\n") });
 

@@ -326,10 +326,24 @@ Obsidian vault ──push──▶ Mealie at home ──sync──▶ whatsfine.
   plans work; lines it can't parse with confidence stay as plain notes.
   Categories are the drafts' `recipe type` (Breakfast, Dessert, Snack); the
   pillar is always Food, so `seed.mjs` no longer sets a category.
-- **The site is the published copy.** The `/food` section reads from a copy
-  the site keeps (built in the whatsfine repo, its own session), so
-  whatsfine.com never depends on the home box being up. The home box is the
-  editor and the kitchen app.
+- **The site is the published copy.** Built 2026-10-25 in the whatsfine repo
+  (commit `1926c48`, `docs/mealie-sync.md` there): a Worker cron pulls the
+  WhatsFine cookbook hourly (or on demand, `POST /api/mealie/sync`) into a
+  `recipes` collection in D1 with images copied to R2, and `/food` renders
+  only from that copy, so whatsfine.com never depends on the home box being
+  up. What that sync reads, and so what our scripts must keep true:
+  - the cookbook slug `whatsfine` (tag **WhatsFine**);
+  - the first tag that isn't WhatsFine is the page's kicker chip, so
+    `obsidian.mjs` tags **Recipe** before any cuisine;
+  - `recipeIngredient[].display` (Mealie fills it for parsed ingredients);
+  - the note titled **WhatsFine tip** is the card's one line, **Printable
+    card** is dropped, every other note is published under the card, which
+    is why "Immediate Thoughts" never leaves the vault;
+  - `extras.whatsfine_article` makes `/food/<slug>` redirect to the article,
+    so a recipe never has two pages; `extras.whatsfine_product` links the
+    shop card; `orgURL` shows as "Adapted from" when it isn't ours.
+  Article pages now emit Recipe JSON-LD, so once the site is deployed
+  `seed.mjs` can import by URL and its `toRecipeJsonLd()` can go.
 - **Hosting is settled:** section 4's option A. `deploy/` has the compose
   file (bind-mounted `./data`, memory cap, Cloudflare Tunnel sidecar behind
   a profile), an env example, and the Access setup, including Access as the
