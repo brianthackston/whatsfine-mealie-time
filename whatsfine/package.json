@@ -6,7 +6,9 @@
   "scripts": {
     "logo": "node brand/build-logo.mjs",
     "seed": "node seed/seed.mjs",
-    "seed:dry": "node seed/seed.mjs --dry-run"
+    "seed:dry": "node seed/seed.mjs --dry-run",
+    "obsidian:push": "node seed/obsidian.mjs push",
+    "obsidian:pull": "node seed/obsidian.mjs pull"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2"

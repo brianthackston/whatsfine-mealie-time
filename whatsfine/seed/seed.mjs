@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-// Seed a Mealie instance with WhatsFine's recipes, through Mealie's public API
-// only: nothing here touches Mealie's code or database, so it keeps working
-// across upstream releases.
+// Seed a Mealie instance with WhatsFine's published recipes, through Mealie's
+// API only: nothing here touches Mealie's code or database.
 //
 // Source: the whatsfine repo's seed/seed.json (EmDash seed). Every published
 // `articles` entry with a `recipe` field becomes a Mealie recipe, built as a
@@ -9,6 +8,9 @@
 // the same path a URL import takes. That mapping is the one whatsfine.com
 // should eventually emit as JSON-LD (Twenty task cap-20261022-recipe-jsonld);
 // once it does, this script can import by URL instead and the mapping can go.
+//
+// For recipes drafted in Obsidian, see obsidian.mjs; both scripts converge on
+// the same Mealie recipe when a draft and an article describe the same dish.
 //
 // Usage (Node 22+, no dependencies):
 //   node seed.mjs --dry-run                  write the payloads to seed/out/, touch nothing
@@ -21,43 +23,35 @@
 //   --site <origin>     whatsfine.com origin for links and images (default https://whatsfine.com)
 //   --replace           delete a recipe of the same name before importing it (default: skip it)
 //   --no-images         do not fetch the site's OG card as the recipe image
+//   --no-parse          leave ingredients as plain lines instead of parsing qty/unit/food
 //   --seed-foods        also run Mealie's own en-US foods and units seeders for the group
 //   --dry-run           no network calls to Mealie; payloads go to seed/out/
-//
-// Auth: MEALIE_TOKEN (a user API token from /user/profile/api-tokens), or
-// MEALIE_USER + MEALIE_PASSWORD for a one-off login. The user's household
-// receives the recipes; the group receives tags, categories and the cookbook.
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { Mealie, cli, compact, isoDuration, slugify } from "./lib/mealie.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-
-// ── CLI ──────────────────────────────────────────────────────────────────
-const args = process.argv.slice(2);
-const flag = (name) => args.includes(name);
-const opt = (name, fallback) => {
-	const i = args.indexOf(name);
-	return i >= 0 && args[i + 1] ? args[i + 1] : fallback;
-};
+const { flag, opt } = cli();
 const config = {
-	url: opt("--url", process.env.MEALIE_URL ?? "http://localhost:9925").replace(/\/+$/, ""),
+	url: opt("--url", process.env.MEALIE_URL ?? "http://localhost:9925"),
 	source: resolve(opt("--source", process.env.WHATSFINE_SEED ?? join(here, "../../../whatsfine/seed/seed.json"))),
 	site: opt("--site", "https://whatsfine.com").replace(/\/+$/, ""),
 	replace: flag("--replace"),
 	images: !flag("--no-images"),
+	parse: !flag("--no-parse"),
 	seedFoods: flag("--seed-foods"),
 	dryRun: flag("--dry-run"),
 	outDir: join(here, "out"),
 };
 
-// ── WhatsFine conventions ───────────────────────────────────────────────
-// Pillar values from the articles collection's `pillar` select, and the
-// bylines list; both live in seed.json. The tag every imported recipe gets
-// is also what the cookbook filters on.
-const PILLAR_LABEL = { food: "Food", play: "Play", tech: "Tech", takes: "Takes" };
-const SOURCE_TAG = "WhatsFine";
-const COOKBOOK = {
+// ── WhatsFine conventions in Mealie ─────────────────────────────────────
+// Tags: the source tag (what the cookbook filters on) plus the article's
+// kicker, which is the site's own sub-type. Categories are left to the
+// Obsidian drafts (`recipe type`: Breakfast, Dessert, Snack …); the pillar
+// is always Food, so it carries no information inside Mealie.
+export const SOURCE_TAG = "WhatsFine";
+export const COOKBOOK = {
 	name: "WhatsFine",
 	description: "Every recipe published on whatsfine.com.",
 	// Mealie's query-filter language (docs: "Advanced Query Filters").
@@ -78,7 +72,7 @@ export function toRecipeJsonLd(article, ctx) {
 		.filter(Boolean)
 		.map((name) => ({ "@type": "Person", name }));
 
-	const ld = {
+	return compact({
 		"@context": "https://schema.org",
 		"@type": "Recipe",
 		name: r.title ?? d.title,
@@ -91,14 +85,8 @@ export function toRecipeJsonLd(article, ctx) {
 		totalTime: isoDuration(r.time),
 		recipeIngredient: r.ingredients ?? [],
 		recipeInstructions: steps.map((text) => ({ "@type": "HowToStep", text })),
-		recipeCategory: [PILLAR_LABEL[d.pillar] ?? d.pillar].filter(Boolean),
 		keywords: [SOURCE_TAG, d.kicker].filter(Boolean).join(", "),
-	};
-	// Mealie reads `image` as a URL to download. The site's OG route renders a
-	// branded 1200x630 card per article; the seed uploads it separately so a
-	// slow fetch cannot fail the import (see uploadImage).
-	for (const k of Object.keys(ld)) if (ld[k] === undefined || ld[k] === "") delete ld[k];
-	return ld;
+	});
 }
 
 // Things schema.org has no slot for, applied with PATCH after the import.
@@ -108,10 +96,7 @@ export function toRecipePatch(article, ctx) {
 	if (r.note) notes.push({ title: "WhatsFine tip", text: r.note });
 	const product = r.product ? ctx.products.get(r.product) : null;
 	if (product) {
-		notes.push({
-			title: "Printable card",
-			text: `${product.title}: ${ctx.site}/shop/${product.slug}`,
-		});
+		notes.push({ title: "Printable card", text: `${product.title}: ${ctx.site}/shop/${product.slug}` });
 	}
 	return {
 		notes,
@@ -128,15 +113,6 @@ export function ogImageUrl(article, ctx) {
 	return `${ctx.site}/og.png?${q}`;
 }
 
-// "20 min", "1 hr 15 min", "1h30m", "45 minutes" → ISO 8601 duration, else undefined.
-export function isoDuration(text) {
-	if (!text) return undefined;
-	const h = /(\d+)\s*(?:h|hr|hrs|hour|hours)\b/i.exec(text)?.[1];
-	const m = /(\d+)\s*(?:m|min|mins|minute|minutes)\b/i.exec(text)?.[1];
-	if (!h && !m) return undefined;
-	return `PT${h ? `${h}H` : ""}${m ? `${m}M` : ""}`;
-}
-
 // ── Source ───────────────────────────────────────────────────────────────
 async function loadSource(path) {
 	const seed = JSON.parse(await readFile(path, "utf8"));
@@ -148,89 +124,7 @@ async function loadSource(path) {
 	return { articles, bylines, products };
 }
 
-// ── Mealie client ───────────────────────────────────────────────────────
-class Mealie {
-	constructor(base, token) {
-		this.base = base;
-		this.token = token;
-	}
-
-	static async login(base) {
-		if (process.env.MEALIE_TOKEN) return new Mealie(base, process.env.MEALIE_TOKEN);
-		const { MEALIE_USER: username, MEALIE_PASSWORD: password } = process.env;
-		if (!username || !password) {
-			throw new Error("Set MEALIE_TOKEN, or MEALIE_USER and MEALIE_PASSWORD (or pass --dry-run).");
-		}
-		const res = await fetch(`${base}/api/auth/token`, {
-			method: "POST",
-			headers: { "Content-Type": "application/x-www-form-urlencoded" },
-			body: new URLSearchParams({ username, password }),
-		});
-		if (!res.ok) throw new Error(`login failed: ${res.status} ${await res.text()}`);
-		return new Mealie(base, (await res.json()).access_token);
-	}
-
-	async call(method, path, body, { form = false } = {}) {
-		const headers = { Authorization: `Bearer ${this.token}` };
-		if (body && !form) headers["Content-Type"] = "application/json";
-		const res = await fetch(`${this.base}/api${path}`, {
-			method,
-			headers,
-			body: body == null ? undefined : form ? body : JSON.stringify(body),
-		});
-		const text = await res.text();
-		if (!res.ok) throw new Error(`${method} ${path} → ${res.status}: ${text.slice(0, 300)}`);
-		try {
-			return JSON.parse(text);
-		} catch {
-			return text;
-		}
-	}
-
-	get = (p) => this.call("GET", p);
-	post = (p, b) => this.call("POST", p, b);
-	patch = (p, b) => this.call("PATCH", p, b);
-	delete = (p) => this.call("DELETE", p);
-}
-
-// Mealie slugs are python-slugify output; for the names we ship this matches.
-const slugify = (s) =>
-	s
-		.normalize("NFKD")
-		.replace(/[̀-ͯ]/g, "")
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
-
-// Mealie title-cases keywords it meets during an import ("Whatsfine"), but
-// keeps the name of a tag that already exists with the same slug. So create
-// the brand tag first, and fix the casing if an earlier import got there.
-async function ensureTags(api, names) {
-	const page = await api.get("/organizers/tags?perPage=-1");
-	const bySlug = new Map((page.items ?? []).map((t) => [t.slug, t]));
-	for (const name of names) {
-		const found = bySlug.get(slugify(name));
-		if (!found) await api.post("/organizers/tags", { name });
-		else if (found.name !== name) await api.call("PUT", `/organizers/tags/${found.id}`, { ...found, name });
-	}
-}
-
-async function ensureCookbook(api) {
-	const page = await api.get("/households/cookbooks?perPage=-1");
-	const existing = (page.items ?? []).find((c) => c.name === COOKBOOK.name);
-	if (existing) return existing;
-	return api.post("/households/cookbooks", COOKBOOK);
-}
-
-async function uploadImage(api, slug, imageUrl) {
-	const res = await fetch(imageUrl);
-	if (!res.ok) throw new Error(`image ${imageUrl} → ${res.status}`);
-	const form = new FormData();
-	form.set("image", new Blob([await res.arrayBuffer()], { type: "image/png" }), `${slug}.png`);
-	form.set("extension", "png");
-	return api.call("PUT", `/recipes/${slug}/image`, form, { form: true });
-}
-
+// ── Import ───────────────────────────────────────────────────────────────
 async function importRecipe(api, article, ctx, existingByName) {
 	const ld = toRecipeJsonLd(article, ctx);
 	const name = ld.name;
@@ -240,18 +134,15 @@ async function importRecipe(api, article, ctx, existingByName) {
 		await api.delete(`/recipes/${prior.slug}`);
 	}
 
-	const slug = await api.post("/recipes/create/html-or-json", {
-		data: JSON.stringify(ld),
-		url: ld.url,
-		includeTags: true,
-		includeCategories: true,
-	});
-	await api.patch(`/recipes/${slug}`, toRecipePatch(article, ctx));
+	const slug = await api.importJsonLd(ld);
+	const patch = toRecipePatch(article, ctx);
+	if (config.parse) patch.recipeIngredient = await api.parseIngredients(ld.recipeIngredient);
+	await api.patch(`/recipes/${slug}`, patch);
 
 	let image = "none";
 	if (config.images) {
 		try {
-			await uploadImage(api, slug, ogImageUrl(article, ctx));
+			await api.uploadImageFromUrl(slug, ogImageUrl(article, ctx));
 			image = "og card";
 		} catch (e) {
 			image = `failed: ${e.message}`;
@@ -285,23 +176,19 @@ async function main() {
 	console.log(`signed in as ${me.email} (group ${me.groupSlug ?? me.group}, household ${me.household})`);
 
 	if (config.seedFoods) {
-		for (const kind of ["foods", "units"]) {
-			await api.post(`/groups/seeders/${kind}`, { locale: "en-US" });
-			console.log(`seeded ${kind} (en-US)`);
-		}
+		await api.seedFoodsAndUnits("en-US");
+		console.log("seeded foods and units (en-US)");
 	}
 
-	await ensureTags(api, [SOURCE_TAG]);
-
-	const existing = await api.get("/recipes?perPage=-1");
-	const existingByName = new Map((existing.items ?? []).map((r) => [String(r.name).toLowerCase(), r]));
+	await api.ensureTags([SOURCE_TAG]);
+	const existingByName = await api.recipesByName();
 
 	for (const a of articles) {
 		const result = await importRecipe(api, a, ctx, existingByName);
 		console.log(`  ${result.action.padEnd(10)} ${result.slug}  (${result.name})${result.image ? `  image: ${result.image}` : ""}`);
 	}
 
-	const cookbook = await ensureCookbook(api);
+	const cookbook = await api.ensureCookbook(COOKBOOK);
 	console.log(`cookbook "${cookbook.name}" → ${config.url}/g/${me.groupSlug ?? "home"}/cookbooks/${cookbook.slug}`);
 }
 

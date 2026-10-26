@@ -296,6 +296,45 @@ the cheapest way to carry a change.
    upstream permits edits to `en-US.json` only, and a voice pass there would be
    a large, conflict-prone diff. Keep the copy stock.
 
+## 9. The shape it's taking (decided 2026-10-25)
+
+Brian's direction: recipes live as a section of whatsfine.com (`/food`), and
+Mealie is a WhatsFine-branded app on hardware at home, fed from Obsidian.
+That settles the open questions in section 6 like this:
+
+```
+Obsidian vault ──push──▶ Mealie at home ──sync──▶ whatsfine.com/food
+010 - Recipes/            kitchen.whatsfine.com     (site keeps its own copy;
+(drafts, Recipe - BT      via Tunnel + Access        serves when the box is off)
+ template)                the family's kitchen app
+```
+
+- **Obsidian is where a recipe starts.** `seed/obsidian.mjs push` reads
+  `010 - Recipes`, creates or updates the Mealie recipe, parses ingredients,
+  and writes `mealie id` back into the note so the vault's "Not in Mealie"
+  Base view empties as drafts land. `recipe type` becomes the Mealie
+  category, `tools` become tools, `cuisine` becomes tags, the Notes section
+  becomes a note, `source` becomes the source link (a whatsfine.com article
+  URL also tags it WhatsFine, which is what the cookbook filters on). A
+  second push updates in place and keeps anything Mealie has that the note
+  has no section for. `pull` goes the other way for recipes typed straight
+  into Mealie, creating notes from the template. Verified live on all three
+  drafts, twice.
+- **Mealie owns the structured recipe.** Both scripts now run Mealie's NLP
+  ingredient parser (`/api/parser/ingredients`) and store quantity, unit and
+  food, which is what makes the servings control, shopping lists and meal
+  plans work; lines it can't parse with confidence stay as plain notes.
+  Categories are the drafts' `recipe type` (Breakfast, Dessert, Snack); the
+  pillar is always Food, so `seed.mjs` no longer sets a category.
+- **The site is the published copy.** The `/food` section reads from a copy
+  the site keeps (built in the whatsfine repo, its own session), so
+  whatsfine.com never depends on the home box being up. The home box is the
+  editor and the kitchen app.
+- **Hosting is settled:** section 4's option A. `deploy/` has the compose
+  file (bind-mounted `./data`, memory cap, Cloudflare Tunnel sidecar behind
+  a profile), an env example, and the Access setup, including Access as the
+  OIDC provider so there's one sign-in.
+
 ## 8. Ways to fold Mealie into the brand
 
 Suggestions only. Each is independent, and none is started.

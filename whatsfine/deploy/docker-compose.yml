@@ -1,0 +1,49 @@
+# WhatsFine Mealie on hardware at home (a NAS, a mini PC, a Raspberry Pi 4/5;
+# upstream's image is published for amd64 and arm64).
+#
+#   cp .env.example .env        # fill in BASE_URL, TZ, and the tunnel token
+#   docker compose up -d        # Mealie only, on the LAN at :9925
+#   docker compose --profile tunnel up -d   # ...plus the Cloudflare Tunnel
+#
+# Data is a bind mount (./data), not a named volume, so a NAS snapshot or an
+# rsync job backs it up without going through Docker. Mealie's own backups
+# (Admin → Backups, also run daily by its scheduler) land in ./data/backups.
+#
+# Pin the tag to the release this fork tracks; bump it after merging upstream.
+services:
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:v3.29.0
+    container_name: mealie
+    restart: unless-stopped
+    ports:
+      - "9925:9000"
+    volumes:
+      - ./data:/app/data/
+      - ../brand/mark.png:/app/brand/mark.png:ro
+    env_file:
+      - ../brand/mealie.env
+      - .env
+    environment:
+      DB_ENGINE: sqlite
+      ALLOW_SIGNUP: "false"
+      # Mealie's daily jobs (backups, scheduled webhooks) run at this time.
+      DAILY_SCHEDULE_TIME: "03:30"
+    deploy:
+      resources:
+        limits:
+          memory: 1000M
+
+  # Publishes Mealie on a whatsfine.com subdomain without opening a port at
+  # home. Create the tunnel in Zero Trust → Networks → Tunnels, route the
+  # hostname to http://mealie:9000, and put an Access application in front of
+  # it (see README.md). The container needs nothing but the token.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: mealie-tunnel
+    restart: unless-stopped
+    profiles: ["tunnel"]
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - mealie
