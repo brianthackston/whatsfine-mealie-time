@@ -304,7 +304,7 @@ That settles the open questions in section 6 like this:
 
 ```
 Obsidian vault ──push──▶ Mealie at home ──sync──▶ whatsfine.com/food
-010 - Recipes/            kitchen.whatsfine.com     (site keeps its own copy;
+010 - Recipes/            recipes.whatsfine.com     (site keeps its own copy;
 (drafts, Recipe - BT      via Tunnel + Access        serves when the box is off)
  template)                the family's kitchen app
 ```
@@ -342,7 +342,8 @@ Suggestions only. Each is independent, and none is started.
 - **What to call it.** `BRANDING_NAME` is the app-bar title, so the instance
   can carry a name of its own rather than the site's: *WhatsFine Kitchen*,
   *The Fine Kitchen*, or plain *WhatsFine* (what `mealie.env` sets today).
-  Pair it with a subdomain: `kitchen.whatsfine.com` or `recipes.whatsfine.com`.
+  The hostname is decided: **`recipes.whatsfine.com`** (2026-10-25); the
+  deploy env and Tunnel notes use it.
 - **Let the site point at it.** The cookbook is public, so the Food pillar page
   (`/food`) can link "Cook along in the kitchen" to
   `/g/home/cookbooks/whatsfine`, and each recipe article's card can link to its

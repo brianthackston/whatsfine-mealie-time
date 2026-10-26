@@ -41,7 +41,7 @@ No port is opened at home. In Zero Trust:
 
 1. **Networks → Tunnels → Create a tunnel.** Pick the Docker connector; copy
    the token into `.env` as `TUNNEL_TOKEN`. Add a public hostname, e.g.
-   `kitchen.whatsfine.com` → service `http://mealie:9000`.
+   `recipes.whatsfine.com` → service `http://mealie:9000`.
 2. **Access → Applications → Add → Self-hosted**, same hostname. A policy
    that allows the family's emails (one-time PIN, or a Google login) is enough.
 3. `docker compose --profile tunnel up -d`.
