@@ -251,9 +251,23 @@ The mapping in `toRecipeJsonLd()` is the schema.org shape the site should emit
 itself (task `cap-20261022-recipe-jsonld`); once it does, the script can
 import by URL and that function retires.
 
-**Not yet verified against a running Mealie** (Docker was down when this was
-built): the dry run produces the payloads under `seed/out/`, but the cookbook
-filter string and the multipart image upload need one real run.
+**Verified live 2026-10-25** against the compose stack (v3.29.0): foods and
+units seeded, three recipes created with the OG card stored as the image, the
+cookbook filter returns all three, notes and extras land, `orgURL` is set. Two
+things to know about how Mealie reads the payload:
+
+- Keywords are title-cased on import ("Whatsfine"), but a tag that already
+  exists with the same slug keeps its name, so the script creates **WhatsFine**
+  first (`ensureTags`) and repairs the casing if an earlier run got there.
+- `recipeYield` "Serves 4–6" becomes `recipeServings: 4` with an empty yield
+  text; "Makes 12" becomes 12 servings. That's Mealie's `clean_yield` reading
+  the first number, and it is the behaviour the site's own JSON-LD will get
+  from any importer, so keep the site's `serves` strings number-first.
+- `totalTime` "PT20M" lands as `totalTimeSeconds: 1200` and shows as
+  "20 minutes"; the legacy `totalTime` text stays null, which is fine.
+- The public explore API (`/api/explore/groups/home/...`) answers 404 until
+  the group, household and recipes are marked public in Mealie's settings;
+  the seed doesn't do that.
 
 ### Small patches worth carrying, if we want them
 
@@ -270,7 +284,15 @@ the cheapest way to carry a change.
    and Hanken Grotesk for body is a `nuxt.config.ts` font entry plus a short
    CSS file. Not upstreamable as-is (upstream would want it configurable), so
    this one is a fork-only patch, kept tiny.
-3. **Nothing else in the UI.** Copy lives in `frontend/app/lang/messages/`;
+3. **"Mealie" where `BRANDING_NAME` should be.** The app bar uses the
+   branding name, but four places still hardcode the product name: the
+   toolbar title on `pages/login.vue:59`, `pages/register/index.vue:23` and
+   `pages/admin/setup.vue:17`, and the copyright line in
+   `components/Layout/LayoutParts/AppFooter.vue:27`. Seen on the live login
+   page under the WF? logo. A four-line change to use `$appInfo.brandingName`,
+   and a natural upstream PR, since #8078 introduced the setting and missed
+   these.
+4. **Nothing else in the UI.** Copy lives in `frontend/app/lang/messages/`;
    upstream permits edits to `en-US.json` only, and a voice pass there would be
    a large, conflict-prone diff. Keep the copy stock.
 

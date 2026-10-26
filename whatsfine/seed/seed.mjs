@@ -202,6 +202,19 @@ const slugify = (s) =>
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
 
+// Mealie title-cases keywords it meets during an import ("Whatsfine"), but
+// keeps the name of a tag that already exists with the same slug. So create
+// the brand tag first, and fix the casing if an earlier import got there.
+async function ensureTags(api, names) {
+	const page = await api.get("/organizers/tags?perPage=-1");
+	const bySlug = new Map((page.items ?? []).map((t) => [t.slug, t]));
+	for (const name of names) {
+		const found = bySlug.get(slugify(name));
+		if (!found) await api.post("/organizers/tags", { name });
+		else if (found.name !== name) await api.call("PUT", `/organizers/tags/${found.id}`, { ...found, name });
+	}
+}
+
 async function ensureCookbook(api) {
 	const page = await api.get("/households/cookbooks?perPage=-1");
 	const existing = (page.items ?? []).find((c) => c.name === COOKBOOK.name);
@@ -277,6 +290,8 @@ async function main() {
 			console.log(`seeded ${kind} (en-US)`);
 		}
 	}
+
+	await ensureTags(api, [SOURCE_TAG]);
 
 	const existing = await api.get("/recipes?perPage=-1");
 	const existingByName = new Map((existing.items ?? []).map((r) => [String(r.name).toLowerCase(), r]));
