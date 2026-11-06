@@ -35,9 +35,29 @@ the ingredient parser has something to match.) Make a user API token
 afterwards (profile → API tokens) and use `MEALIE_TOKEN` instead of the
 password for anything scheduled.
 
+## Publishing to whatsfine.com
+
+The site never calls Mealie. A script in the whatsfine repo,
+`scripts/mealie-sync.mjs`, runs wherever Mealie is reachable and writes each
+recipe in the WhatsFine cookbook into the site's articles through EmDash's
+API (`docs/mealie-sync.md` there). On this box that is a cron line with both
+repos cloned, Node 22+ and pnpm installed, and in the whatsfine checkout a
+`mealie-local.json` (`{ "url": "http://localhost:9925", "token": "<Mealie
+user API token>" }`) plus an `emdash-local.json` with a site PAT:
+
+```cron
+*/15 * * * *  cd ~/whatsfine && pnpm run mealie:sync >> ~/mealie-sync.log 2>&1
+```
+
+`pnpm obsidian:pull` (notes for recipes typed straight into Mealie) wants
+the Obsidian vault on the same machine, so unless the vault syncs to the
+box, run it from the PC that has the vault, pointed at the box:
+`MEALIE_URL=http://<box>:9925 MEALIE_TOKEN=… pnpm obsidian:pull`.
+
 ## Reaching it from outside: Cloudflare Tunnel + Access
 
-No port is opened at home. In Zero Trust:
+Only needed to use Mealie away from home; the site doesn't need it. No port
+is opened at home. In Zero Trust:
 
 1. **Networks → Tunnels → Create a tunnel.** Pick the Docker connector; copy
    the token into `.env` as `TUNNEL_TOKEN`. Add a public hostname, e.g.

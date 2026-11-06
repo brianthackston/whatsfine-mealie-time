@@ -326,24 +326,47 @@ Obsidian vault ──push──▶ Mealie at home ──sync──▶ whatsfine.
   plans work; lines it can't parse with confidence stay as plain notes.
   Categories are the drafts' `recipe type` (Breakfast, Dessert, Snack); the
   pillar is always Food, so `seed.mjs` no longer sets a category.
-- **The site is the published copy.** Built 2026-10-25 in the whatsfine repo
-  (commit `1926c48`, `docs/mealie-sync.md` there): a Worker cron pulls the
-  WhatsFine cookbook hourly (or on demand, `POST /api/mealie/sync`) into a
-  `recipes` collection in D1 with images copied to R2, and `/food` renders
-  only from that copy, so whatsfine.com never depends on the home box being
-  up. What that sync reads, and so what our scripts must keep true:
+- **The site stores the published copy on its articles.** Reshaped
+  2026-11-05 in the whatsfine repo (commit `79b5479`, `docs/mealie-sync.md`
+  there; live since 2026-11-06). The first cut (a `recipes` collection in
+  D1, a Worker cron, `/food/<slug>`) was torn out. Now
+  `scripts/mealie-sync.mjs` in the whatsfine repo runs **beside Mealie**,
+  wherever Mealie is reachable, and writes each cookbook recipe into an
+  `articles` entry through EmDash's REST API: the card into `recipe`,
+  photos and video into `gallery`, bookkeeping into `mealie_sync`. An
+  article that exists keeps its story, byline and featured photo; a recipe
+  with no article gets one created and published. Every recipe is served at
+  `/recipes/<article-slug>` (`/articles/<slug>` 301s there), listed at
+  `/recipes`, with a schema.org Recipe node on each page. The site never
+  calls Mealie, so it serves when the home box is off and the Tunnel is only
+  for using Mealie away from home. What that sync reads, and so what our
+  scripts must keep true:
   - the cookbook slug `whatsfine` (tag **WhatsFine**);
-  - the first tag that isn't WhatsFine is the page's kicker chip, so
-    `obsidian.mjs` tags **Recipe** before any cuisine;
+  - matching: `extras.whatsfine_article` (our seed and `obsidian.mjs` set
+    it) first, else the Mealie id the article remembers; for a new article
+    the sync writes `extras.whatsfine_article` back into Mealie;
+  - the first tag that isn't WhatsFine becomes the kicker of a *new*
+    article, so `obsidian.mjs` tags **Recipe** before any cuisine;
   - `recipeIngredient[].display` (Mealie fills it for parsed ingredients);
+    `recipeYieldQuantity` + `recipeYield`, else `recipeServings`;
   - the note titled **WhatsFine tip** is the card's one line, **Printable
-    card** is dropped, every other note is published under the card, which
-    is why "Immediate Thoughts" never leaves the vault;
-  - `extras.whatsfine_article` makes `/food/<slug>` redirect to the article,
-    so a recipe never has two pages; `extras.whatsfine_product` links the
-    shop card; `orgURL` shows as "Adapted from" when it isn't ours.
-  Article pages now emit Recipe JSON-LD, so once the site is deployed
-  `seed.mjs` can import by URL and its `toRecipeJsonLd()` can go.
+    card** is dropped; other notes are not published, but keep
+    "Immediate Thoughts" in the vault anyway;
+  - `extras.whatsfine_product` links the shop card; `extras.whatsfine_grid`
+    (the card's operation grid as JSON) overrides the grid the sync derives
+    from steps and ingredients; `extras.whatsfine_video` (URLs) and
+    YouTube/Vimeo links in notes become embeds; Mealie `assets` become the
+    photos & video section;
+  - a Mealie photo becomes a new article's featured image unless it is the
+    site's own 1200×630 OG card, so real photos uploaded to Mealie flow
+    through, and the OG cards the seed uploads do not.
+  The site doc's cron for the home box is both repos cloned there and,
+  every 15 minutes, `pnpm run mealie:sync` then `pnpm obsidian:pull`; the
+  pull needs the vault on that machine (`--vault`), so it may run on the
+  PC that has the vault instead. Known gap on our side: `pull` creates
+  notes but doesn't update existing ones. Article pages emit Recipe
+  JSON-LD, so `seed.mjs` can import by URL and its `toRecipeJsonLd()` can
+  go.
 - **Hosting is settled:** section 4's option A. `deploy/` has the compose
   file (bind-mounted `./data`, memory cap, Cloudflare Tunnel sidecar behind
   a profile), an env example, and the Access setup, including Access as the
