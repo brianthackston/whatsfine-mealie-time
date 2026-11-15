@@ -5,18 +5,16 @@
     "recipe": {
         "unique-name-error": "Ime recepta mora biti unikatno",
         "recipe-created": "Recept ustvarjen",
-        "made-this-as-side": "{name} made this as a side",
-        "made-this-for-breakfast": "{name} made this for breakfast",
-        "made-this-for-lunch": "{name} made this for lunch",
-        "made-this-for-dinner": "{name} made this for dinner",
-        "made-this-for-snack": "{name} made this for a snack",
-        "made-this-for-drink": "{name} made this for a drink",
-        "made-this-for-dessert": "{name} made this for dessert",
+        "made-this-as-side": "{name} je to naredil kot stranski element",
+        "made-this-for-breakfast": "{name} je to pripravil za zajtrk",
+        "made-this-for-lunch": "{name} je to pripravil za kosilo",
+        "made-this-for-dinner": "{name} je to pripravil za večerjo",
+        "made-this-for-snack": "{name} je to pripravil za prigrizek",
+        "made-this-for-drink": "{name} je to pripravil za pijačo",
+        "made-this-for-dessert": "{name} je to pripravil za sladico",
         "recipe-image-deleted": "Slika recepta je bila izbrisana",
         "recipe-defaults": {
-            "ingredient-note": "skodelica moke",
-            "name": "New Recipe",
-            "step-text": "Postopek priprave recepta, kot tudi druga polja v receptu podpirajo markdown sintakso.\n\n**Dodaj povezavo**\n\n[Moja povezava](https://demo.mealie.io)\n"
+            "name": "New Recipe"
         },
         "servings-text": {
             "makes": "Naredi",
@@ -27,11 +25,21 @@
             "yields": "donosi"
         },
         "and-amount": "in {amount}",
+        "pdf": {
+            "cookbook": "Cookbook",
+            "contents": "Contents",
+            "ingredients": "Ingredients",
+            "instructions": "Instructions",
+            "notes": "Notes",
+            "prep-time": "Prep",
+            "cook-time": "Cook",
+            "total-time": "Total"
+        },
         "import-errors": {
             "ai-not-enabled": "Storitve umetne inteligence niso omogočene",
             "ai-request-failed": "Ponudnik umetne inteligence ni mogel dokončati zahteve. Poskusite znova",
             "image-provider-not-enabled": "Storitve slikanja z umetno inteligenco niso omogočene",
-            "invalid-mealie-export": "This looks like a recipe exported from Mealie, but it could not be imported",
+            "invalid-mealie-export": "To je videti kot recept, izvožen iz aplikacije Mealie, vendar ga ni bilo mogoče uvoziti",
             "no-recipe-found": "V navedenem viru ni bilo mogoče najti nobenega recepta",
             "no-source": "Niso bili posredovani nobena vsebina, slike ali URL",
             "provider-returned-nothing": "Ponudnik umetne inteligence ni vrnil recepta",
@@ -45,6 +53,7 @@
             "creating-recipe-from-webpage-data": "Ustvarjanje recepta iz podatkov spletne strani...",
             "downloading-image": "Prenašanje slike...",
             "downloading-video": "Prenašanje videoposnetka...",
+            "enriching-instructions": "Adding step details...",
             "extracting-recipe-data": "Pridobivanje podatkov o receptih...",
             "fetching-webpage": "Pridobivanje spletne strani...",
             "organizing-recipe": "Organizacija recepta...",
@@ -124,7 +133,10 @@
         "test-message-body": "This is a test notification from Mealie.",
         "mealplan-entry-created": "Meal plan entry created for {date} for {entry_type}",
         "mealplan-entry-updated": "Meal plan entry updated for {date} for {entry_type}",
-        "mealplan-entry-deleted": "Meal plan entry deleted for {date} for {entry_type}"
+        "mealplan-entry-deleted": "Meal plan entry deleted for {date} for {entry_type}",
+        "mealplan-range-entry-created": "Vnos v načrt obrokov, ustvarjen za obdobje od {date} do {end_date} za {entry_type}",
+        "mealplan-range-entry-updated": "Vnos v načrtu obrokov za obdobje od {date} do {end_date} za {entry_type} je posodobljen",
+        "mealplan-range-entry-deleted": "Vnos v načrtu obrokov za obdobje od {date} do {end_date} za {entry_type} je bil izbrisan"
     },
     "datetime": {
         "year": "leto|let",
