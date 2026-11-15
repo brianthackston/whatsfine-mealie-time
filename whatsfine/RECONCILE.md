@@ -252,11 +252,10 @@ The plan as written before the work:
 
 ### Stage 5: elegant pages and rich results
 
-**Partly done 2026-11-15:** whatsfine commit `5ed0560`, live as Worker
-version `6edf7827`; `verify-jsonld` and `check:live` (195 pages) pass.
-The prod sync then wrote the tools (2 updated, 1 unchanged; a second dry
-run says 3 unchanged), and they are live on the cards and in the JSON-LD.
-Done:
+**Done 2026-11-15, except the photos (Brian's).** whatsfine commits
+`5ed0560` and `858d2ed`, live as Worker version `f93429f5`;
+`verify-jsonld` and `check:live` (195 pages) pass. The prod sync wrote the
+tools (2 updated, 1 unchanged; a second dry run says 3 unchanged). Done:
 
 - **Images ready for real photos.** The recipe page's hero is a responsive
   16:9 `srcset` with `fetchpriority="high"`. The Recipe JSON-LD lists
@@ -278,14 +277,21 @@ Done:
   `www.whatsfine.com` path now answers 301 to the same path on the apex,
   query kept, including pages the edge cache holds (those answered 200
   before). The site's middleware note says why.
+- **Notes.** Mealie's other notes render as a Notes section under the
+  method, without the seed's "By Jess Thackston" line or a line that only
+  repeats the card's tip.
+- **Search reads the recipe.** The `recipe` field is searchable, so
+  ingredients, steps, tools and notes are found ("sage", "skillet",
+  "biscuits" live). Its JSON field names are indexed too, noted in the
+  site's `docs/mealie-sync.md`.
+- **Video markup.** Each gallery video becomes a `VideoObject` on the
+  Recipe (file or YouTube/Vimeo player, a thumbnail, the publish date). No
+  live recipe has a video yet; tested on a local copy.
 
 Still open:
 
 - **Real dish photos** (Brian). Upload one in Mealie; the next sync puts
   it on the page, the JSON-LD and the share card.
-- Site search indexing recipe text (an emdash search-field change),
-  rendering `recipe.notes`, and VideoObject markup. The site's
-  `docs/mealie-sync.md` "Not done" keeps this list.
 
 The plan as written:
 
