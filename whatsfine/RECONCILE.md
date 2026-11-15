@@ -122,6 +122,14 @@ In `scripts/mealie-sync.mjs` and `scripts/lib/mealie-map.mjs`:
 
 ### Stage 2: reconcile the content once, then run the first real sync
 
+**Done 2026-11-15.** Brian chose live wording and Title Case names. The
+vault notes now carry the live text. The three WhatsFine notes were pushed
+to Mealie and the names set. The first production sync ran at 06:31 UTC,
+with D1 bookmark `000038e0-000008d4-00005124-49d50a12ccb019baa93338895de6aa97`
+taken beforehand. It changed only each recipe's title casing, category and
+notes. A second run reported all three unchanged, and the live checks pass.
+Since then, whatsfine.com, Mealie and the vault agree on these recipes.
+
 1. Bring the live wording (Decision 1) into the vault notes. Fix the names
    (Decision 2). Fruity's hand grid and prep row now survive the sync
    either way. The sync keeps the article's prep row and folds Mealie's
