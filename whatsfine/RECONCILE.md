@@ -274,13 +274,15 @@ Done:
 - **Links.** The free recipe-card product page links back to its recipe.
   Site search links recipe results to `/recipes/`, not through the
   `/articles/` 301.
+- **`www` → apex.** Brian added a zone Redirect Rule ("www to apex"). Every
+  `www.whatsfine.com` path now answers 301 to the same path on the apex,
+  query kept, including pages the edge cache holds (those answered 200
+  before). The site's middleware note says why.
 
 Still open:
 
 - **Real dish photos** (Brian). Upload one in Mealie; the next sync puts
   it on the page, the JSON-LD and the share card.
-- **`www` → apex redirect.** It needs a Cloudflare Redirect Rule on the
-  zone, which is Brian's to approve.
 - Site search indexing recipe text (an emdash search-field change),
   rendering `recipe.notes`, and VideoObject markup. The site's
   `docs/mealie-sync.md` "Not done" keeps this list.
