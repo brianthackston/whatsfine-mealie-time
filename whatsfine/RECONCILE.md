@@ -86,6 +86,15 @@ passes against production. What holds the pages back is the data going in.
 
 ### Stage 1: make the site sync safe and faithful (site repo)
 
+**Done 2026-11-14:** whatsfine commit `dd84ee7`, live as Worker version
+`f90f20fc`. Everything below shipped except the VideoObject markup, which
+needs a thumbnail and upload date, and showing `recipe.notes` on the page.
+It also guards against things the list didn't foresee, found by two review
+rounds: a Mealie duplicate taking the original's page, a deleted article
+being re-created, failed publishes going quiet, and cleanup deleting
+shared media. The details are in `docs/mealie-sync.md` there. The dry run
+now shows wording differences only.
+
 In `scripts/mealie-sync.mjs` and `scripts/lib/mealie-map.mjs`:
 
 - Make writes to production explicit: require `--prod` (or `--site`). Refuse
@@ -113,12 +122,16 @@ In `scripts/mealie-sync.mjs` and `scripts/lib/mealie-map.mjs`:
 
 ### Stage 2: reconcile the content once, then run the first real sync
 
-1. Bring the live wording (Decision 1) and Fruity's prep step into the vault
-   notes. Fix the names (Decision 2).
+1. Bring the live wording (Decision 1) into the vault notes. Fix the names
+   (Decision 2). Fruity's hand grid and prep row now survive the sync
+   either way. The sync keeps the article's prep row and folds Mealie's
+   "Butter, for greasing the pan" into it.
 2. Push the vault to Mealie, after the Stage 3 fixes below that touch push.
 3. Snapshot production (the repo's pre-prod-write bookmark), run
-   `mealie:sync -- --dry-run`, and read the diff. It should show only
-   bookkeeping. Then run it for real, then `verify-jsonld`.
+   `pnpm run mealie:sync:dry`, and read the field-level diff. It should
+   show only the new fields (category, notes). Then run
+   `pnpm run mealie:sync -- --prod --allow-test-mealie`, since the only
+   Mealie is still the test instance. Then run `verify-jsonld`.
 
 ### Stage 3: an Obsidian ↔ Mealie sync that can stay in sync (this fork)
 
