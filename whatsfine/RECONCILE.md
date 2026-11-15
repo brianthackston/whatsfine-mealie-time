@@ -252,6 +252,40 @@ The plan as written before the work:
 
 ### Stage 5: elegant pages and rich results
 
+**Partly done 2026-11-15:** whatsfine commit `5ed0560`, live as Worker
+version `6edf7827`; `verify-jsonld` and `check:live` (195 pages) pass.
+The tools reach the live pages with the next prod sync (`MAP_VERSION` 5;
+the dry run shows only the tools changing). Done:
+
+- **Images ready for real photos.** The recipe page's hero is a responsive
+  16:9 `srcset` with `fetchpriority="high"`. The Recipe JSON-LD lists
+  16:9, 4:3 and 1:1 crops of the dish photo, falling back to the first
+  gallery image and then the OG card. `og:image` is a 1200×630 crop of
+  the photo when there is one.
+- **The card reads better.** On phones a plain Ingredients list comes
+  before the grid. The card has real headings: the recipe name (h2), then
+  Ingredients, At a glance and The method (h3). Mealie's tools show as a
+  "You'll need" line and as schema.org `HowToTool` (`MAP_VERSION` 5).
+- **`/recipes` cards** show time and servings instead of read time. A
+  card without a photo no longer shows "Recipe photo" text. The lead
+  card's image loads eagerly.
+- **Canonicals** on `/recipes` and the home page (`og:url` follows).
+- **Links.** The free recipe-card product page links back to its recipe.
+  Site search links recipe results to `/recipes/`, not through the
+  `/articles/` 301.
+
+Still open:
+
+- **Real dish photos** (Brian). Upload one in Mealie; the next sync puts
+  it on the page, the JSON-LD and the share card.
+- **`www` → apex redirect.** It needs a Cloudflare Redirect Rule on the
+  zone, which is Brian's to approve.
+- Site search indexing recipe text (an emdash search-field change),
+  rendering `recipe.notes`, and VideoObject markup. The site's
+  `docs/mealie-sync.md` "Not done" keeps this list.
+
+The plan as written:
+
 - **Real dish photos.** This is the biggest single gain. Google's recipe rich
   result needs a real image, ideally in 16:9, 4:3 and 1:1. Today every image
   in Mealie is a text card, and every recipe card on the site shows a "RECIPE
