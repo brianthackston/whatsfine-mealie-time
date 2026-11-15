@@ -83,9 +83,12 @@ That gives two sign-ins (Access, then Mealie). Two ways to make it one:
 
 - `./data` holds everything (SQLite DB, images, the auto-generated secrets).
   Snapshot or rsync it.
-- Mealie writes its own backup zips to `./data/backups` daily; Admin →
-  Backups restores one. Copy that folder off the box; `rclone` to the
-  `whatsfine-media` R2 bucket under `mealie-backups/` is the natural home.
+- Mealie does **not** make backups on its own. Make one with Admin →
+  Backups (or `POST /api/admin/backups`); it lands in `./data/backups`, and
+  the same page restores one. Schedule that call and copy the zips off the
+  box to the private `whatsfine-mealie-backups` R2 bucket. Not
+  `whatsfine-media`: the site serves files from that bucket by key, and a
+  backup holds password hashes and Mealie's secret keys.
 
 ## Updating
 

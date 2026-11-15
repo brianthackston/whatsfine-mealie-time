@@ -19,7 +19,10 @@ services:
     container_name: mealie-local
     restart: unless-stopped
     ports:
-      - "9925:9000"
+      # Loopback only: this instance keeps upstream's default admin login,
+      # so nothing else on the network should reach it. The site sync and
+      # obsidian.mjs run on this machine and use localhost.
+      - "127.0.0.1:9925:9000"
     volumes:
       - mealie-local-data:/app/data/
       # The logo that brand/mealie.env points BRANDING_LOGO_PATH at.
