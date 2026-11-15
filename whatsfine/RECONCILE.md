@@ -254,8 +254,9 @@ The plan as written before the work:
 
 **Partly done 2026-11-15:** whatsfine commit `5ed0560`, live as Worker
 version `6edf7827`; `verify-jsonld` and `check:live` (195 pages) pass.
-The tools reach the live pages with the next prod sync (`MAP_VERSION` 5;
-the dry run shows only the tools changing). Done:
+The prod sync then wrote the tools (2 updated, 1 unchanged; a second dry
+run says 3 unchanged), and they are live on the cards and in the JSON-LD.
+Done:
 
 - **Images ready for real photos.** The recipe page's hero is a responsive
   16:9 `srcset` with `fetchpriority="high"`. The Recipe JSON-LD lists
