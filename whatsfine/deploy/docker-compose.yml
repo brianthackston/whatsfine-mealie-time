@@ -12,7 +12,7 @@
 # Pin the tag to the release this fork tracks; bump it after merging upstream.
 services:
   mealie:
-    image: ghcr.io/mealie-recipes/mealie:v3.29.0
+    image: ghcr.io/mealie-recipes/mealie:v3.31.0
     container_name: mealie
     restart: unless-stopped
     ports:
@@ -38,7 +38,7 @@ services:
   # hostname to http://mealie:9000, and put an Access application in front of
   # it (see README.md). The container needs nothing but the token.
   cloudflared:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared:2026.10.7  # pinned; bump after reading its release notes
     container_name: mealie-tunnel
     restart: unless-stopped
     profiles: ["tunnel"]

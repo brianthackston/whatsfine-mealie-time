@@ -1,9 +1,10 @@
 # Mealie, for WhatsFine: an orientation
 
 Written 2026-10-22 against upstream `mealie-next` at `7f099c91` (latest release
-**v3.29.0**, 2026-10-17). This is a map of the codebase and of the places it
-can meet our stack. It is not a plan: no creative or strategic direction has
-been set yet.
+**v3.29.0**, 2026-10-17); the fork has since merged **v3.31.0** (2026-11-15).
+This is a map of the codebase and of the places it can meet our stack. The
+direction, and the plan that came out of it, are in section 9 and
+`RECONCILE.md`; running it all day to day is `deploy/README.md`.
 
 This file lives in `whatsfine/` on purpose. Upstream has no such folder, so
 nothing in it can ever conflict with an upstream merge. See "Staying aligned"

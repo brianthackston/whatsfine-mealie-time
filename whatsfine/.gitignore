@@ -3,3 +3,5 @@ seed/out/
 deploy/.env
 deploy/data/
 mealie-local.json
+deploy/run.env
+deploy/alert-webhook.txt

@@ -206,6 +206,35 @@ Bugs to fix along the way:
 
 ### Stage 4: run it unattended
 
+**Partly done 2026-11-15.** Done:
+
+- **Upgrade.** Merged upstream v3.31.0 (merge `491cc783`, which brings the
+  security fixes), bumped both compose files, and pinned `cloudflared` to
+  2026.10.7. Backed up, then upgraded the local Mealie: its migration ran,
+  and all three syncs still agree.
+- **Backups.** `deploy/backup.mjs` makes a Mealie backup, keeps 14, and
+  copies each zip to the private R2 bucket.
+- **The runner.** `deploy/run.mjs` gives each job a lock, a log, a status
+  file and a failure webhook.
+- **Schedules on PORTABLETEXT.** The Obsidian sync runs every 15 minutes and
+  the backup daily, from Task Scheduler. Both are tested.
+- **One runbook.** `deploy/README.md` is it, and the site doc points there.
+- **The site's `RUNBOOK.md`** turned out to be brianthackston.com's. It now
+  carries a warning and the right D1 backup method; a full rewrite is a
+  follow-up.
+
+Left, mostly Brian's:
+
+- the box itself, restored from a backup (steps in `deploy/README.md`)
+- an alert webhook URL
+- the R2 lifecycle rule
+- Tunnel and Access, only for using Mealie away from home
+
+Until the box exists, the site sync stays manual.
+
+The plan as written before the work:
+
+
 - Merge upstream **v3.31.0** into `whatsfine`. The merge is clean, and it
   carries cross-group write, stored-HTML-injection and asset-permission fixes.
   Back up first, because migration `127804c19431` drops `cook_time`. Then
