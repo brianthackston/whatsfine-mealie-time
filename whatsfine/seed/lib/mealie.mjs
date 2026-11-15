@@ -1,6 +1,7 @@
 // A small client for Mealie's REST API, shared by seed.mjs and obsidian.mjs.
 // Node 22+, no dependencies. Everything goes through the public API so it
 // keeps working across upstream releases; nothing touches Mealie's code or DB.
+import { existsSync, readFileSync } from "node:fs";
 
 export class Mealie {
 	constructor(base, token) {
@@ -8,9 +9,17 @@ export class Mealie {
 		this.token = token;
 	}
 
-	/** MEALIE_TOKEN (a user API token), or MEALIE_USER + MEALIE_PASSWORD for a one-off login. */
-	static async login(base) {
+	/** MEALIE_TOKEN (a user API token); else a token file (`{ "url", "token" }`,
+	 *  the shape of the site's mealie-local.json), which a scheduled run needs
+	 *  because it has no environment to read; else MEALIE_USER +
+	 *  MEALIE_PASSWORD for a one-off login. */
+	static async login(base, { tokenFile, baseWins = false } = {}) {
 		if (process.env.MEALIE_TOKEN) return new Mealie(base, process.env.MEALIE_TOKEN);
+		if (tokenFile && existsSync(tokenFile)) {
+			const j = JSON.parse(readFileSync(tokenFile, "utf8"));
+			// An address given on purpose (--url, MEALIE_URL) beats the file's.
+			if (j.token) return new Mealie(baseWins ? base : j.url || base, j.token);
+		}
 		const { MEALIE_USER: username, MEALIE_PASSWORD: password } = process.env;
 		if (!username || !password) {
 			throw new Error("Set MEALIE_TOKEN, or MEALIE_USER and MEALIE_PASSWORD (or pass --dry-run).");
@@ -88,9 +97,13 @@ export class Mealie {
 	// ── Organizers ─────────────────────────────────────────────────────────
 	// Mealie title-cases keywords it meets during an import ("Whatsfine") but
 	// keeps the name of an organizer that already exists with the same slug.
-	// So create them first, with our casing, and repair any earlier drift.
+	// So create them first, with our casing. An existing organizer is used as
+	// it is: tags, categories and tools are shared by every recipe in the
+	// group, so a note spelling one differently must not rename it for all.
+	// Only the names in `repair` (the WhatsFine tag) have their casing fixed.
 
-	async ensureOrganizers(kind, names) {
+	async ensureOrganizers(kind, names, { repair = [] } = {}) {
+		const fix = new Set(repair.map((n) => n.toLowerCase()));
 		// kind: "tags" | "categories" | "tools"
 		// Tags and categories page their results; tools answer with a bare list.
 		const page = await this.get(`/organizers/${kind}?perPage=-1`);
@@ -111,7 +124,7 @@ export class Mealie {
 					found = (Array.isArray(hits) ? hits : hits.items ?? []).find((t) => t.name.toLowerCase() === name.toLowerCase());
 					if (!found) throw e;
 				}
-			} else if (found.name !== name) {
+			} else if (found.name !== name && fix.has(name.toLowerCase())) {
 				found = await this.put(`/organizers/${kind}/${found.id}`, { ...found, name });
 			}
 			bySlug.set(found.slug, found);
@@ -121,9 +134,9 @@ export class Mealie {
 		return out;
 	}
 
-	ensureTags = (names) => this.ensureOrganizers("tags", names);
-	ensureCategories = (names) => this.ensureOrganizers("categories", names);
-	ensureTools = (names) => this.ensureOrganizers("tools", names);
+	ensureTags = (names, opts) => this.ensureOrganizers("tags", names, opts);
+	ensureCategories = (names, opts) => this.ensureOrganizers("categories", names, opts);
+	ensureTools = (names, opts) => this.ensureOrganizers("tools", names, opts);
 
 	async ensureCookbook(spec) {
 		const page = await this.get("/households/cookbooks?perPage=-1");
@@ -196,20 +209,23 @@ export const slugify = (s) =>
 		.replace(/[^a-z0-9]+/g, "-")
 		.replace(/^-+|-+$/g, "");
 
-/** "20 min", "1 hr 15 min", "1h30m", "45 minutes" → ISO 8601 duration, else undefined. */
+/** "20 min", "1 hr 15 min", "1h30m", "45 minutes" → ISO 8601 duration, else
+ *  undefined (also for zero, which "PT" alone would not express). */
 export function isoDuration(text) {
 	const s = durationSeconds(text);
-	if (s == null) return undefined;
+	if (!s) return undefined;
 	const h = Math.floor(s / 3600);
 	const m = Math.round((s % 3600) / 60);
 	return `PT${h ? `${h}H` : ""}${m ? `${m}M` : ""}`;
 }
 
-/** Same inputs → seconds (Mealie's `*TimeSeconds` fields), else undefined. */
+/** Same inputs → seconds (Mealie's `*TimeSeconds` fields), else undefined.
+ *  A unit ends at a non-letter, not a word boundary, so "1h30m" reads as
+ *  90 minutes (in "1h30m" there is no boundary between "h" and "3"). */
 export function durationSeconds(text) {
 	if (!text) return undefined;
-	const h = /(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/i.exec(text)?.[1];
-	const m = /(\d+)\s*(?:m|min|mins|minute|minutes)\b/i.exec(text)?.[1];
+	const h = /(\d+(?:\.\d+)?)\s*(?:hours|hour|hrs|hr|h)(?![a-z])/i.exec(text)?.[1];
+	const m = /(\d+)\s*(?:minutes|minute|mins|min|m)(?![a-z])/i.exec(text)?.[1];
 	if (!h && !m) return undefined;
 	return Math.round((Number(h ?? 0) * 60 + Number(m ?? 0)) * 60);
 }
@@ -223,13 +239,17 @@ export function compact(obj) {
 	return obj;
 }
 
-/** Small CLI helpers shared by the scripts. */
-export function cli(argv = process.argv.slice(2)) {
+/** Small CLI helpers shared by the scripts. `valued` names the options that
+ *  take a value (`--vault <path>`), so the word after any other flag is still
+ *  a positional: `--dry-run sync` keeps its command. */
+export function cli(argv = process.argv.slice(2), valued = []) {
+	const takes = new Set(valued);
 	const flag = (name) => argv.includes(name);
 	const opt = (name, fallback) => {
 		const i = argv.indexOf(name);
 		return i >= 0 && argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[i + 1] : fallback;
 	};
-	const positional = argv.filter((a, i) => !a.startsWith("--") && !(i > 0 && argv[i - 1].startsWith("--") && !argv[i - 1].includes("=")));
-	return { flag, opt, positional };
+	const all = (name) => argv.flatMap((a, i) => (a === name && argv[i + 1] && !argv[i + 1].startsWith("--") ? [argv[i + 1]] : []));
+	const positional = argv.filter((a, i) => a !== "--" && !a.startsWith("--") && !(i > 0 && takes.has(argv[i - 1])));
+	return { flag, opt, all, positional };
 }

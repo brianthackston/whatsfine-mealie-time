@@ -1,0 +1,508 @@
+{
+ "chipped-beef-gravy": {
+  "id": "fc25412d-92d9-468b-bf55-02d5fdd2d56d",
+  "slug": "chipped-beef-gravy",
+  "name": "Chipped Beef & Gravy",
+  "description": "A traditional, savory breakfast — inexpensive, protein-packed, and on the table in fifteen minutes.",
+  "orgURL": "https://whatsfine.com/articles/chipped-beef-and-gravy",
+  "recipeYield": "Serves 4",
+  "recipeYieldQuantity": 0,
+  "recipeServings": 4,
+  "prepTimeSeconds": null,
+  "performTimeSeconds": null,
+  "totalTimeSeconds": 900,
+  "rating": null,
+  "tags": [
+   {
+    "name": "WhatsFine"
+   },
+   {
+    "name": "Recipe"
+   }
+  ],
+  "recipeCategory": [
+   {
+    "name": "Breakfast"
+   }
+  ],
+  "tools": [],
+  "notes": [
+   {
+    "title": "Notes",
+    "text": "- By Jess Thackston, WhatsFine.\n- Taste before salting; dried beef is cured and usually brings enough on its own.\n- Build the gravy gently so it stays smooth, not gluey.\n- Also good over biscuits or a split baked potato.",
+    "referenceId": "a504830d-3e1a-465b-b3f6-4250adf27363"
+   },
+   {
+    "title": "WhatsFine tip",
+    "text": "Taste before salting — dried beef is cured and usually brings enough on its own.",
+    "referenceId": "f8442f55-ddfb-4d7a-bb91-f9249d4daef3"
+   },
+   {
+    "title": "Printable card",
+    "text": "Chipped Beef & Gravy Card: https://whatsfine.com/shop/chipped-beef-card",
+    "referenceId": "7497f553-3a89-47b8-8357-fcbec6af2282"
+   }
+  ],
+  "extras": {
+   "whatsfine_article": "chipped-beef-and-gravy",
+   "whatsfine_product": "chipped-beef-card",
+   "obsidian_note": "Chipped Beef & Gravy.md",
+   "obsidian_status": "Draft"
+  },
+  "recipeIngredient": [
+   {
+    "quantity": 3,
+    "unit": {
+     "name": "tablespoon",
+     "pluralName": "tablespoons",
+     "abbreviation": "tbsp",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "butter"
+    },
+    "note": "",
+    "display": "3 tablespoons butter",
+    "originalText": "3 tbsp butter"
+   },
+   {
+    "quantity": 3,
+    "unit": {
+     "name": "tablespoon",
+     "pluralName": "tablespoons",
+     "abbreviation": "tbsp",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "all-purpose flour"
+    },
+    "note": "",
+    "display": "3 tablespoons all-purpose flour",
+    "originalText": "3 tbsp all-purpose flour"
+   },
+   {
+    "quantity": 2,
+    "unit": {
+     "name": "cup",
+     "pluralName": "cups",
+     "abbreviation": "c",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "whole milk"
+    },
+    "note": "",
+    "display": "2 cups whole milk",
+    "originalText": "2 cups whole milk"
+   },
+   {
+    "quantity": 4,
+    "unit": {
+     "name": "ounce",
+     "pluralName": "ounces",
+     "abbreviation": "oz",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "dried chipped beef"
+    },
+    "note": "torn",
+    "display": "4 ounces dried chipped beef torn",
+    "originalText": "4 oz dried chipped beef, torn"
+   },
+   {
+    "quantity": null,
+    "unit": null,
+    "food": null,
+    "note": "Black pepper",
+    "display": "Black pepper",
+    "originalText": "Black pepper"
+   },
+   {
+    "quantity": 0,
+    "unit": null,
+    "food": {
+     "name": "Toast"
+    },
+    "note": "to serve",
+    "display": "Toast to serve",
+    "originalText": "Toast, to serve"
+   }
+  ],
+  "recipeInstructions": [
+   {
+    "text": "If the beef is very salty, rinse and pat dry. Tear into bite-size pieces."
+   },
+   {
+    "text": "Melt the butter, whisk in the flour, and cook 1 minute to a pale roux."
+   },
+   {
+    "text": "Add the milk slowly, whisking, until it thickens to a pourable gravy."
+   },
+   {
+    "text": "Stir in the beef, pepper generously, and spoon over hot toast."
+   }
+  ]
+ },
+ "fruity-rice-krispy-treats": {
+  "id": "b65bd46d-b213-4321-8fca-a430628c9db1",
+  "slug": "fruity-rice-krispy-treats",
+  "name": "Fruity Rice Krispy Treats",
+  "description": "A simple twist on a classic — party pleasers that won't break the budget and disappear in minutes.",
+  "orgURL": "https://whatsfine.com/articles/fruity-rice-krispy-treats",
+  "recipeYield": "Makes 12",
+  "recipeYieldQuantity": 12,
+  "recipeServings": 0,
+  "prepTimeSeconds": null,
+  "performTimeSeconds": null,
+  "totalTimeSeconds": 600,
+  "rating": null,
+  "tags": [
+   {
+    "name": "WhatsFine"
+   },
+   {
+    "name": "Recipe"
+   }
+  ],
+  "recipeCategory": [
+   {
+    "name": "Dessert"
+   }
+  ],
+  "tools": [
+   {
+    "name": "Large pot"
+   },
+   {
+    "name": "9×13-inch pan"
+   }
+  ],
+  "notes": [
+   {
+    "title": "Notes",
+    "text": "- By Jess Thackston, WhatsFine.\n- Pull the marshmallows off the heat as soon as they melt; overcooked marshmallow sets hard and chewy.\n- Press gently, just enough to hold together. Butter your hands first.",
+    "referenceId": "c954dde7-a29f-4b9d-8305-6ebe4ad5cf46"
+   },
+   {
+    "title": "WhatsFine tip",
+    "text": "Press, don't mash — packed-tight treats set up like bricks.",
+    "referenceId": "e52cfd63-ee5b-483e-b1bb-1623658e4597"
+   },
+   {
+    "title": "Printable card",
+    "text": "Fruity Rice Krispy Treats Card: https://whatsfine.com/shop/rice-krispy-card",
+    "referenceId": "b925d74d-87ba-40da-8b72-86bfbe0b998d"
+   }
+  ],
+  "extras": {
+   "whatsfine_article": "fruity-rice-krispy-treats",
+   "whatsfine_product": "rice-krispy-card",
+   "obsidian_note": "Fruity Rice Krispy Treats.md",
+   "obsidian_status": "Draft"
+  },
+  "recipeIngredient": [
+   {
+    "quantity": 3,
+    "unit": {
+     "name": "tablespoon",
+     "pluralName": "tablespoons",
+     "abbreviation": "tbsp",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "butter"
+    },
+    "note": "",
+    "display": "3 tablespoons butter",
+    "originalText": "3 tbsp butter"
+   },
+   {
+    "quantity": 1,
+    "unit": {
+     "name": "bag",
+     "pluralName": null,
+     "abbreviation": "",
+     "pluralAbbreviation": "",
+     "aliases": []
+    },
+    "food": {
+     "name": "mini marshmallows"
+    },
+    "note": "(10 oz)",
+    "display": "1 bag mini marshmallows (10 oz)",
+    "originalText": "1 bag (10 oz) mini marshmallows"
+   },
+   {
+    "quantity": 6,
+    "unit": {
+     "name": "cup",
+     "pluralName": "cups",
+     "abbreviation": "c",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "fruity crisped-rice cereal"
+    },
+    "note": "",
+    "display": "6 cups fruity crisped-rice cereal",
+    "originalText": "6 cups fruity crisped-rice cereal"
+   },
+   {
+    "quantity": 1,
+    "unit": {
+     "name": "pinch",
+     "pluralName": "pinches",
+     "abbreviation": "",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "salt"
+    },
+    "note": "",
+    "display": "1 pinch salt",
+    "originalText": "Pinch of salt"
+   }
+  ],
+  "recipeInstructions": [
+   {
+    "text": "Before you start: Butter a 9×13-in pan"
+   },
+   {
+    "text": "Melt the butter in a big pot over low heat."
+   },
+   {
+    "text": "Add the marshmallows and stir until just melted — no longer."
+   },
+   {
+    "text": "Off the heat, fold in the cereal and a pinch of salt until coated."
+   },
+   {
+    "text": "Press lightly into a buttered 9×13 pan, cool, and cut into squares."
+   }
+  ]
+ },
+ "sausage-gravy-crackers": {
+  "id": "c2a27cce-35f2-420d-a865-aedaf75520df",
+  "slug": "sausage-gravy-crackers",
+  "name": "Sausage Gravy & Crackers",
+  "description": "The cheapest, most savory snack around — it may not look like much, but it's guaranteed popular.",
+  "orgURL": "https://whatsfine.com/articles/sausage-gravy-and-crackers",
+  "recipeYield": "Serves 4–6",
+  "recipeYieldQuantity": 0,
+  "recipeServings": 4,
+  "prepTimeSeconds": null,
+  "performTimeSeconds": null,
+  "totalTimeSeconds": 1200,
+  "rating": null,
+  "tags": [
+   {
+    "name": "WhatsFine"
+   },
+   {
+    "name": "Recipe"
+   }
+  ],
+  "recipeCategory": [
+   {
+    "name": "Snack"
+   }
+  ],
+  "tools": [
+   {
+    "name": "Skillet"
+   }
+  ],
+  "notes": [
+   {
+    "title": "Notes",
+    "text": "- By Jess Thackston, WhatsFine.\n- Don't drain the fat. Lean sausage? Add a pat of butter before the flour; the roux needs the fat.\n- Some people swear by a pinch of sage or a hit of hot sauce.",
+    "referenceId": "5efde58d-022a-4dc4-9a1c-3034757e62be"
+   },
+   {
+    "title": "WhatsFine tip",
+    "text": "Lean sausage? Add a pat of butter before the flour — the roux needs the fat.",
+    "referenceId": "46ec6f7b-fcdd-4593-8141-94b4077e32d0"
+   },
+   {
+    "title": "Printable card",
+    "text": "Sausage Gravy & Crackers Card: https://whatsfine.com/shop/sausage-gravy-card",
+    "referenceId": "3e83450e-2b3a-45bd-b92c-53bd24787e5d"
+   }
+  ],
+  "extras": {
+   "whatsfine_article": "sausage-gravy-and-crackers",
+   "whatsfine_product": "sausage-gravy-card",
+   "obsidian_note": "Sausage Gravy & Crackers.md",
+   "obsidian_status": "Draft"
+  },
+  "recipeIngredient": [
+   {
+    "quantity": 1,
+    "unit": {
+     "name": "pound",
+     "pluralName": "pounds",
+     "abbreviation": "lb",
+     "pluralAbbreviation": "lbs",
+     "aliases": []
+    },
+    "food": {
+     "name": "breakfast sausage"
+    },
+    "note": "",
+    "display": "1 pound breakfast sausage",
+    "originalText": "1 lb bulk breakfast sausage"
+   },
+   {
+    "quantity": 0.25,
+    "unit": {
+     "name": "cup",
+     "pluralName": "cups",
+     "abbreviation": "c",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "all-purpose flour"
+    },
+    "note": "",
+    "display": "¹/₄ cup all-purpose flour",
+    "originalText": "1/4 cup all-purpose flour"
+   },
+   {
+    "quantity": 2.5,
+    "unit": {
+     "name": "cup",
+     "pluralName": "cups",
+     "abbreviation": "c",
+     "pluralAbbreviation": null,
+     "aliases": []
+    },
+    "food": {
+     "name": "whole milk"
+    },
+    "note": "",
+    "display": "2 ¹/₂ cups whole milk",
+    "originalText": "2 1/2 cups whole milk"
+   },
+   {
+    "quantity": null,
+    "unit": null,
+    "food": null,
+    "note": "Lots of black pepper",
+    "display": "Lots of black pepper",
+    "originalText": "Lots of black pepper"
+   },
+   {
+    "quantity": 0,
+    "unit": null,
+    "food": {
+     "name": "salt"
+    },
+    "note": "to taste",
+    "display": "salt to taste",
+    "originalText": "Salt to taste"
+   },
+   {
+    "quantity": 0,
+    "unit": null,
+    "food": {
+     "name": "Saltine crackers"
+    },
+    "note": "to serve",
+    "display": "Saltine crackers to serve",
+    "originalText": "Saltine crackers, to serve"
+   }
+  ],
+  "recipeInstructions": [
+   {
+    "text": "Brown and crumble the sausage in a skillet — keep all the fat."
+   },
+   {
+    "text": "Sprinkle the flour over, stir, and cook 1–2 minutes until it smells nutty."
+   },
+   {
+    "text": "Pour in the milk slowly, whisking, and simmer until it coats a spoon (5–8 min)."
+   },
+   {
+    "text": "Pepper hard, salt to taste, and spoon over a plate of saltines."
+   }
+  ]
+ },
+ "brown-butter": {
+  "id": "b5585b99-f464-4dd0-b342-c0143e1ebf79",
+  "slug": "brown-butter",
+  "name": "Brown butter",
+  "description": "Butter, cooked until the milk solids go amber and it smells like hazelnuts. The one technique that upgrades everything it touches.",
+  "orgURL": "",
+  "recipeYield": "cup",
+  "recipeYieldQuantity": 0.5,
+  "recipeServings": 4,
+  "prepTimeSeconds": null,
+  "performTimeSeconds": null,
+  "totalTimeSeconds": 480,
+  "rating": null,
+  "tags": [
+   {
+    "name": "Technique"
+   }
+  ],
+  "recipeCategory": [
+   {
+    "name": "Food"
+   }
+  ],
+  "tools": [],
+  "notes": [
+   {
+    "title": "WhatsFine tip",
+    "text": "Stop a shade early: it keeps cooking in the pan.",
+    "referenceId": "8059a99a-db5b-47e9-b415-761275f18b3d"
+   },
+   {
+    "title": "Keeps",
+    "text": "A week in the fridge, months in the freezer.",
+    "referenceId": "a9cc2406-3f9a-4830-bb24-58ffb4ad9691"
+   }
+  ],
+  "extras": {
+   "whatsfine_article": "brown-butter"
+  },
+  "recipeIngredient": [
+   {
+    "quantity": 0,
+    "unit": null,
+    "food": null,
+    "note": "1 stick (8 tbsp) unsalted butter",
+    "display": "1 stick (8 tbsp) unsalted butter",
+    "originalText": null
+   },
+   {
+    "quantity": 0,
+    "unit": null,
+    "food": null,
+    "note": "Pinch of salt",
+    "display": "Pinch of salt",
+    "originalText": null
+   }
+  ],
+  "recipeInstructions": [
+   {
+    "text": "Before you start: use a light-colored pan so you can watch the color."
+   },
+   {
+    "text": "Melt the butter over medium heat and keep it moving."
+   },
+   {
+    "text": "When the foam quiets and the milk solids turn amber and smell nutty, pull it off the heat and salt it."
+   }
+  ]
+ }
+}

@@ -13,7 +13,8 @@ scripts that talk to Mealie's API.
 | [brand/mark.svg](brand/mark.svg), `mark.png` | The "WF?" tile Mealie shows in the app bar, on the login page and as favicon; `mark-q` is the question mark alone |
 | [brand/build-logo.mjs](brand/build-logo.mjs) | Renders the SVGs to PNG with the real Bricolage Grotesque (`pnpm logo`) |
 | [seed/seed.mjs](seed/seed.mjs) | Imports whatsfine.com's published recipes, tags and cookbook through the API, parsing ingredients into quantities (`pnpm seed:dry` to preview, `pnpm seed` to run) |
-| [seed/obsidian.mjs](seed/obsidian.mjs) | Obsidian ↔ Mealie: `pnpm obsidian:push` sends the vault's recipe drafts to Mealie and writes `mealie id` back; `pnpm obsidian:pull` creates notes for recipes that exist only in Mealie |
+| [seed/obsidian.mjs](seed/obsidian.mjs) | Obsidian ↔ Mealie, both ways: `pnpm obsidian:sync` (`:dry` to preview) keeps each note and its recipe in agreement field by field, the side that changed winning |
+| [seed/lib/contract.mjs](seed/lib/contract.mjs), [note.mjs](seed/lib/note.mjs) | The sync's field contract and three-way rule, and the in-place note editing; tests in `sync.test.mjs` (`pnpm test`) |
 | [seed/lib/mealie.mjs](seed/lib/mealie.mjs) | The API client both scripts share |
 | [deploy/](deploy/README.md) | Running it on hardware at home: compose with a bind-mounted data folder, Cloudflare Tunnel + Access, backups |
 

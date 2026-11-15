@@ -2,13 +2,14 @@
   "name": "@whatsfine/mealie-tools",
   "private": true,
   "type": "module",
-  "description": "WhatsFine-side tooling for the Mealie fork: brand assets and seeding. Separate from upstream's frontend/ workspace on purpose.",
+  "description": "WhatsFine-side tooling for the Mealie fork: brand assets, seeding, and the Obsidian sync. Separate from upstream's frontend/ workspace on purpose.",
   "scripts": {
     "logo": "node brand/build-logo.mjs",
     "seed": "node seed/seed.mjs",
     "seed:dry": "node seed/seed.mjs --dry-run",
-    "obsidian:push": "node seed/obsidian.mjs push",
-    "obsidian:pull": "node seed/obsidian.mjs pull"
+    "obsidian:sync": "node seed/obsidian.mjs sync",
+    "obsidian:sync:dry": "node seed/obsidian.mjs sync --dry-run",
+    "test": "node --test \"seed/**/*.test.mjs\""
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2"

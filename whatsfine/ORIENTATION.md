@@ -303,23 +303,30 @@ Mealie is a WhatsFine-branded app on hardware at home, fed from Obsidian.
 That settles the open questions in section 6 like this:
 
 ```
-Obsidian vault ──push──▶ Mealie at home ──sync──▶ whatsfine.com/food
+Obsidian vault ◀─sync─▶ Mealie at home ──sync──▶ whatsfine.com/recipes
 010 - Recipes/            recipes.whatsfine.com     (site keeps its own copy;
 (drafts, Recipe - BT      via Tunnel + Access        serves when the box is off)
  template)                the family's kitchen app
 ```
 
-- **Obsidian is where a recipe starts.** `seed/obsidian.mjs push` reads
-  `010 - Recipes`, creates or updates the Mealie recipe, parses ingredients,
-  and writes `mealie id` back into the note so the vault's "Not in Mealie"
-  Base view empties as drafts land. `recipe type` becomes the Mealie
-  category, `tools` become tools, `cuisine` becomes tags, the Notes section
-  becomes a note, `source` becomes the source link (a whatsfine.com article
-  URL also tags it WhatsFine, which is what the cookbook filters on). A
-  second push updates in place and keeps anything Mealie has that the note
-  has no section for. `pull` goes the other way for recipes typed straight
-  into Mealie, creating notes from the template. Verified live on all three
-  drafts, twice.
+- **Obsidian and Mealie stay in sync, both ways** (since 2026-11-15).
+  `pnpm obsidian:sync` (`seed/obsidian.mjs`) compares every shared field of
+  each note in `010 - Recipes` (subfolders included) with its Mealie recipe
+  three ways: the vault's value, Mealie's, and the value both agreed on last
+  time, a short hash per field kept in the recipe's `extras.obsidian_sync`.
+  The side that changed wins. When both changed, nothing is written for that
+  field and the note gets a conflict callout; `--prefer vault|mealie` settles
+  it. The field list and who owns what is the header of
+  `seed/lib/contract.mjs`. Notes are edited in place, only the keys and list
+  items the contract owns, so Immediate Thoughts, embeds, `%% comments %%`
+  and sub-headings stay put. Mealie's lists are merged: an unchanged
+  ingredient keeps its parsed food and the reference id steps link to.
+  A note without a `mealie id` creates its recipe; a recipe no note ever
+  had gets a note; a recipe deleted in Mealie marks its note Archived and is
+  never re-created. `whatsfine: true` in a note is the publish flag (the
+  WhatsFine tag). A run with nothing to do writes nothing, and `--dry-run`
+  writes nothing at all. Tests: `pnpm test`, against real notes and recipes
+  in `seed/lib/__fixtures__/`.
 - **Mealie owns the structured recipe.** Both scripts now run Mealie's NLP
   ingredient parser (`/api/parser/ingredients`) and store quantity, unit and
   food, which is what makes the servings control, shopping lists and meal
@@ -360,11 +367,9 @@ Obsidian vault ──push──▶ Mealie at home ──sync──▶ whatsfine.
   - a Mealie photo becomes a new article's featured image unless it is the
     site's own 1200×630 OG card, so real photos uploaded to Mealie flow
     through, and the OG cards the seed uploads do not.
-  The site doc's cron for the home box is both repos cloned there and,
-  every 15 minutes, `pnpm run mealie:sync` then `pnpm obsidian:pull`; the
-  pull needs the vault on that machine (`--vault`), so it may run on the
-  PC that has the vault instead. Known gap on our side: `pull` creates
-  notes but doesn't update existing ones. Article pages emit Recipe
+  The site sync runs from cron on the box (`pnpm run mealie:sync -- --prod`);
+  `pnpm obsidian:sync` needs the vault, so it runs on the PC that has it
+  (RECONCILE.md, Stage 4). Article pages emit Recipe
   JSON-LD, so `seed.mjs` can import by URL and its `toRecipeJsonLd()` can
   go.
 - **Hosting is settled:** section 4's option A. `deploy/` has the compose

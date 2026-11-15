@@ -1,71 +1,102 @@
 #!/usr/bin/env node
-// Obsidian ↔ Mealie. Recipes are drafted as notes in the vault's recipe
-// folder, using the "Recipe - BT" template; this script pushes them into
-// Mealie through its API, writes Mealie's id back into the note's
-// `mealie id` property (which the "Not in Mealie" Base view keys on), and can
-// pull recipes that exist only in Mealie back into the vault as new notes.
+// Obsidian ↔ Mealie, both ways. Recipes are drafted as notes in the vault's
+// recipe folder ("Recipe - BT" template) and kept in Mealie; this keeps the
+// two in agreement, field by field, with a rule for who wins:
 //
-// The note format it reads and writes (Templates/Recipe - BT.md):
-//
-//   ---
-//   base type: [Recipe]        marks the note as a recipe
-//   recipe type: [Breakfast]   → Mealie category
-//   status: [Draft]            → extras.obsidian_status
-//   source: <url>              → Mealie's source link (orgURL); a whatsfine.com
-//                                article URL also sets extras.whatsfine_article
-//   yield / servings           → recipeYield (Mealie reads the first number as servings)
-//   prep time / cook time / total time   "20 minutes", "1 hr 15 min" → Mealie times
-//   cuisine: [..]              → tags
-//   tools: [..]                → Mealie tools
-//   mealie id:                 written by this script after a push
-//   ---
-//   ## Immediate Thoughts      stays in the vault (drafting scratch; Mealie notes get published)
-//   ## Ingredients             - one per line → ingredients (parsed to qty/unit/food)
-//   ## Instructions            1. one per line → steps
-//   ## Notes                   - bullets → one Mealie note
-//   ## Image and Tagline       first paragraph → description
+//   - each shared field (seed/lib/contract.mjs lists them) is compared three
+//     ways: the vault's value, Mealie's, and the value both agreed on at the
+//     last sync (a short hash per field, kept in the recipe's
+//     extras.obsidian_sync). The side that changed wins; when both changed,
+//     nothing is written for that field and the note gets a conflict callout.
+//   - a note is edited in place: only the frontmatter keys and list items the
+//     contract owns are rewritten ("Immediate Thoughts", embeds, comments,
+//     sub-headings, Obsidian tags and any other section stay as they are),
+//     and only when the bytes actually change.
+//   - Mealie's lists are merged, not rebuilt: an unchanged ingredient keeps
+//     its parsed food, unit and the reference steps link to; only new or
+//     changed lines go through the parser.
+//   - writes go note first, then Mealie, with the agreed hashes last: a run
+//     that fails halfway leaves the next run to finish it, never to undo it.
+//   - a note with no `mealie id` creates its recipe in Mealie; a Mealie
+//     recipe no note knows (and never knew) gets a new note; a recipe
+//     deleted in Mealie marks its note `status: Archived` and is never
+//     re-created.
+//   - a run with nothing to do writes nothing, to the vault or to Mealie, and
+//     --dry-run writes nothing at all.
 //
 // Usage (Node 22+, no dependencies):
-//   node obsidian.mjs push [--dry-run] [--replace] [--no-parse] [--no-write-back]
-//   node obsidian.mjs pull [--dry-run]
+//   node obsidian.mjs sync [--dry-run] [options]
 //
 // Options:
-//   --vault <path>     the vault; default: the vault Obsidian has open (%APPDATA%\obsidian\obsidian.json), or $OBSIDIAN_VAULT
-//   --folder <name>    recipe folder inside the vault (default "010 - Recipes", or $OBSIDIAN_RECIPES)
-//   --url <base>       Mealie base URL (default http://localhost:9925, or $MEALIE_URL)
-//   --replace          push: delete and re-import a recipe Mealie already has, instead of updating it in place
-//   --no-parse         push: leave ingredients as plain lines
-//   --no-write-back    push: do not write `mealie id` into the notes
-//   --dry-run          push: write payloads to seed/out/obsidian/; pull: print what would be created
+//   --vault <path>       the vault; default: the vault Obsidian has open (%APPDATA%\obsidian\obsidian.json), or $OBSIDIAN_VAULT
+//   --folder <name>      recipe folder inside the vault, read with its subfolders (default "010 - Recipes", or $OBSIDIAN_RECIPES)
+//   --url <base>         Mealie base URL (default http://localhost:9925, or $MEALIE_URL); beats the token file's url
+//   --token-file <path>  { "url", "token" } JSON (default whatsfine/mealie-local.json, gitignored)
+//   --prefer vault|mealie  settle every conflict (and a first sync that disagrees) for one side
+//   --skip <x>           leave one recipe out (note name, Mealie slug or id); repeatable
+//   --no-create          don't create Mealie recipes for notes without a `mealie id`
+//   --no-new-notes       don't create notes for Mealie recipes the vault lacks
+//   --restore-notes      do write a note for a recipe whose note has gone missing from the vault
+//   --allow-archive      archive notes even when many of their recipes are missing (a wrong Mealie looks like that)
+//   --no-parse           send new ingredient lines as plain notes, not through Mealie's parser
+//   --dry-run            say what would change; write nothing anywhere
 //
-// Auth as for seed.mjs: MEALIE_TOKEN, or MEALIE_USER + MEALIE_PASSWORD.
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+// Auth: MEALIE_TOKEN, or the token file, or MEALIE_USER + MEALIE_PASSWORD.
+// Exit code 1 on an error or an unresolved conflict, so a scheduled run is
+// noticed.
+import { randomUUID } from "node:crypto";
+import { existsSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Mealie, cli, compact, durationSeconds, isoDuration, slugify } from "./lib/mealie.mjs";
-import { SOURCE_TAG } from "./seed.mjs";
+import { Mealie, cli } from "./lib/mealie.mjs";
+import {
+	FIELDS,
+	KICKER_TAGS,
+	SOURCE_TAG,
+	SYNC_EXTRA,
+	applyValues,
+	articleFromSource,
+	fp,
+	isNotesNote,
+	mergeIngredients,
+	mergeSteps,
+	readBase,
+	readSync,
+	reconcile,
+	show,
+} from "./lib/contract.mjs";
+import { duplicateSections, readNoteText, setFrontmatter, splitNote, withCallout } from "./lib/note.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const { flag, opt, positional } = cli();
-const command = positional[0];
+const VALUED = ["--vault", "--folder", "--url", "--token-file", "--prefer", "--skip"];
+const { flag, opt, all, positional } = cli(process.argv.slice(2), VALUED);
+const command = positional[0] ?? "sync";
 const config = {
 	url: opt("--url", process.env.MEALIE_URL ?? "http://localhost:9925"),
+	urlGiven: opt("--url") != null || Boolean(process.env.MEALIE_URL),
 	vault: opt("--vault", process.env.OBSIDIAN_VAULT),
 	folder: opt("--folder", process.env.OBSIDIAN_RECIPES ?? "010 - Recipes"),
 	template: "Templates/Recipe - BT.md",
-	replace: flag("--replace"),
+	tokenFile: resolve(opt("--token-file", join(here, "..", "mealie-local.json"))),
+	prefer: opt("--prefer"),
+	skip: new Set(all("--skip").map((s) => s.toLowerCase())),
+	create: !flag("--no-create"),
+	newNotes: !flag("--no-new-notes"),
+	restoreNotes: flag("--restore-notes"),
+	allowArchive: flag("--allow-archive"),
 	parse: !flag("--no-parse"),
-	writeBack: !flag("--no-write-back"),
 	dryRun: flag("--dry-run"),
-	outDir: join(here, "out", "obsidian"),
 };
+const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD, local
+const OWNED_SECTIONS = ["Ingredients", "Instructions", "Notes", "Image and Tagline"];
 
-// ── Vault discovery ─────────────────────────────────────────────────────
-async function findVault() {
+// ── Vault ───────────────────────────────────────────────────────────────
+function findVault() {
 	if (config.vault) return resolve(config.vault);
 	const appData = process.env.APPDATA ?? join(process.env.HOME ?? "", "AppData/Roaming");
 	try {
-		const cfg = JSON.parse(await readFile(join(appData, "obsidian", "obsidian.json"), "utf8"));
+		const cfg = JSON.parse(readFileSync(join(appData, "obsidian", "obsidian.json"), "utf8"));
 		const vaults = Object.values(cfg.vaults ?? {});
 		const open = vaults.find((v) => v.open) ?? vaults[0];
 		if (open?.path) return open.path;
@@ -75,323 +106,485 @@ async function findVault() {
 	throw new Error("No vault found: pass --vault <path> or set OBSIDIAN_VAULT.");
 }
 
-// ── Note parsing ────────────────────────────────────────────────────────
-// A deliberately small YAML reader for the template's frontmatter: scalars,
-// block lists (`- item`), inline lists (`[a, b]`), empty values. Keys may
-// contain spaces and emoji (the template has a ⭐ property).
-export function parseFrontmatter(text) {
-	const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text);
-	if (!m) return { data: {}, body: text, raw: "" };
-	const data = {};
-	let key = null;
-	for (const line of m[1].split(/\r?\n/)) {
-		const item = /^\s+-\s*(.*)$/.exec(line);
-		if (item && key) {
-			if (!Array.isArray(data[key])) data[key] = [];
-			if (item[1] !== "") data[key].push(unquote(item[1]));
+/** Recipe notes in the folder and its subfolders (an "Archive" subfolder is
+ *  still the vault knowing the recipe). */
+function loadNotes(folder) {
+	const out = [];
+	const walk = (dir) => {
+		for (const f of readdirSync(dir)) {
+			if (f.startsWith(".")) continue;
+			const p = join(dir, f);
+			if (statSync(p).isDirectory()) walk(p);
+			else if (f.endsWith(".md")) out.push({ path: p, ...readNoteText(readFileSync(p, "utf8"), f) });
+		}
+	};
+	walk(folder);
+	return out.filter((n) => n.isRecipe);
+}
+
+/** Write a note only when its bytes change, through a temp file, so a
+ *  crash or Obsidian Sync never sees half a note. */
+function writeNote(path, text, { create = false } = {}) {
+	if (!create && existsSync(path) && readFileSync(path, "utf8") === text) return false;
+	if (config.dryRun) return true;
+	const tmp = `${path}.sync-tmp`;
+	writeFileSync(tmp, text);
+	renameSync(tmp, path);
+	return true;
+}
+
+// ── Mealie writes ───────────────────────────────────────────────────────
+/** The PATCH body for the fields the vault won, and the extras to merge.
+ *  In a dry run nothing is looked up or created, so the body is a sketch. */
+async function patchFor(api, recipe, pushed, { isNew = false } = {}) {
+	const p = {};
+	const extras = {};
+	const v = (k) => pushed[k];
+	const has = (k) => k in pushed;
+	const dry = config.dryRun;
+	if (has("name")) p.name = v("name");
+	if (has("description")) p.description = v("description");
+
+	let ingredients = recipe.recipeIngredient ?? [];
+	if (has("ingredients")) {
+		const merged = mergeIngredients(ingredients, v("ingredients"));
+		const fresh = merged.filter((m) => m.parse).map((m) => m.parse);
+		const parsed =
+			dry || !fresh.length ? [] : config.parse ? await api.parseIngredients(fresh) : fresh.map((line) => ({ note: line, originalText: line }));
+		// A new line gets its own reference id: Mealie stores a row sent
+		// without one as null and invents a fresh id on every read, so a step
+		// could never stay linked to it.
+		let k = 0;
+		ingredients = merged.map((m) => {
+			if (m.keep) return m.keep;
+			if (dry) return { note: m.parse, originalText: m.parse };
+			// A changed line keeps the old row's title and reference id (steps
+			// link to it); only the parse is new.
+			return { ...parsed[k++], title: m.reuse?.title ?? "", referenceId: m.reuse?.referenceId ?? randomUUID() };
+		});
+		p.recipeIngredient = ingredients;
+	}
+	const live = ingredients.map((i) => i.referenceId).filter(Boolean);
+	if (has("steps")) p.recipeInstructions = mergeSteps(recipe.recipeInstructions, v("steps"), live);
+	else if (has("ingredients")) {
+		// Same steps, but none may point at an ingredient that is gone.
+		const same = (recipe.recipeInstructions ?? []).map((s) => String(s.text ?? "").replace(/\s+/g, " ").trim());
+		const cleaned = mergeSteps(recipe.recipeInstructions, same, live);
+		const before = (recipe.recipeInstructions ?? []).flatMap((s) => s.ingredientReferences ?? []).length;
+		if (cleaned.flatMap((s) => s.ingredientReferences).length !== before) p.recipeInstructions = cleaned;
+	}
+	if (has("notes")) {
+		// Only the first note titled "Notes" is the vault's; others stay.
+		const notes = [...(recipe.notes ?? [])];
+		const at = notes.findIndex(isNotesNote);
+		const text = v("notes").map((l) => `- ${l}`).join("\n");
+		const mine = v("notes").length ? { ...(at >= 0 ? notes[at] : {}), title: at >= 0 ? notes[at].title : "Notes", text } : null;
+		if (at >= 0) notes.splice(at, 1, ...(mine ? [mine] : []));
+		else if (mine) notes.push(mine);
+		p.notes = notes;
+	}
+	const organizers = (kind, names) => (dry ? names.map((name) => ({ name })) : api.ensureOrganizers(kind, names, { repair: [SOURCE_TAG] }));
+	if (has("categories")) p.recipeCategory = await organizers("categories", v("categories"));
+	if (has("tools")) p.tools = await organizers("tools", v("tools"));
+	if (has("cuisine") || has("whatsfine") || isNew) {
+		// Tags carry three things: the kicker (Mealie's), WhatsFine (the
+		// publish flag) and the cuisines (the vault's). Rebuild all three.
+		const current = (recipe.tags ?? []).map((t) => t.name);
+		const kickers = current.filter((t) => KICKER_TAGS.has(t.toLowerCase()));
+		if (!kickers.length && isNew) kickers.push("Recipe");
+		const on = has("whatsfine") ? v("whatsfine") : current.some((t) => t.toLowerCase() === SOURCE_TAG.toLowerCase());
+		const cuisine = has("cuisine") ? v("cuisine") : current.filter((t) => !KICKER_TAGS.has(t.toLowerCase()) && t.toLowerCase() !== SOURCE_TAG.toLowerCase());
+		p.tags = await organizers("tags", [...(on ? [SOURCE_TAG] : []), ...kickers, ...cuisine]);
+	}
+	if (has("prepTime")) p.prepTimeSeconds = v("prepTime") || null;
+	if (has("cookTime")) p.performTimeSeconds = v("cookTime") || null;
+	if (has("totalTime")) {
+		p.totalTimeSeconds = v("totalTime") || null;
+		if (!v("totalTime")) p.totalTime = null;
+	}
+	if (has("yield")) {
+		// The phrase is the yield; a stale quantity from an import would make
+		// the site print "Makes 12 Makes 12".
+		p.recipeYield = v("yield");
+		p.recipeYieldQuantity = 0;
+	}
+	if (has("servings")) p.recipeServings = v("servings") ?? 0;
+	if (has("source")) {
+		p.orgURL = v("source") || null;
+		const article = articleFromSource(v("source"));
+		if (article && !recipe.extras?.whatsfine_article) extras.whatsfine_article = article;
+	}
+	if (has("status")) extras.obsidian_status = v("status");
+	if (has("recommendedBy")) extras.recommended_by = v("recommendedBy");
+	return { patch: p, extras };
+}
+
+const syncExtra = (fields) => JSON.stringify({ v: 1, fields });
+
+// ── One note ↔ one recipe ───────────────────────────────────────────────
+const report = { pushed: 0, pulled: 0, inSync: 0, created: 0, newNotes: 0, archived: 0, conflicts: 0, errors: 0 };
+const say = (name, msg) => console.log(`  ${name.padEnd(32)} ${msg}`);
+let self;
+const me = async (api) => (self ??= await api.get("/users/self"));
+let myRatings;
+/** The signed-in user's own rating of a recipe. A recipe's `rating` is the
+ *  average over every user, so ⭐ (one person's) is read from here. */
+async function ownRating(api, recipeId) {
+	if (!myRatings) {
+		const res = await api.get("/users/self/ratings");
+		myRatings = new Map((res.ratings ?? []).map((x) => [x.recipeId, x.rating]));
+	}
+	const r = myRatings.get(recipeId);
+	return r > 0 ? r : null;
+}
+
+async function syncPair(api, note, recipe, { creatingNote = false } = {}) {
+	const dup = duplicateSections(note.body, OWNED_SECTIONS);
+	if (dup.length) throw new Error(`the note has more than one "## ${dup.join('", "## ')}" section; merge them before it can sync`);
+
+	recipe = { ...recipe, rating: await ownRating(api, recipe.id) };
+	const meta = readSync(recipe);
+	// Being created: marked so in Mealie, or (if the run that created it died
+	// before it could mark it) the note says `mealie id: creating`.
+	const isNew = meta?.creating === true || (creatingNote && !meta);
+	// A new recipe drafted from a whatsfine.com article is meant for the site,
+	// unless the note says otherwise; the note is told so too.
+	const defaults = {};
+	if (isNew && note.data.whatsfine == null && articleFromSource(note.data.source)) {
+		note = { ...note, data: { ...note.data, whatsfine: "true" } };
+		defaults.whatsfine = true;
+	}
+	const base = isNew ? null : readBase(recipe);
+	const decisions = reconcile(note, recipe, base, { prefer: isNew ? "vault" : config.prefer, creating: isNew });
+	const pushed = {};
+	const pulled = {};
+	const conflicts = [];
+	const nextBase = { ...(base ?? {}) };
+	for (const d of decisions) {
+		if (d.action === "push") pushed[d.key] = d.vault;
+		if (d.action === "pull") pulled[d.key] = d.mealie;
+		if (d.action === "conflict") conflicts.push({ field: d.key, vault: show(d.vault), mealie: show(d.mealie) });
+		else nextBase[d.key] = d.agreed;
+	}
+	const fileName = basename(note.path);
+	const { patch, extras } = await patchFor(api, recipe, pushed, { isNew });
+
+	// 1. The note: Mealie's winners, the id, the conflict callout.
+	let text = applyValues(note.text, { ...pulled, ...defaults });
+	if (String(note.data["mealie id"] ?? "") !== recipe.id) text = setFrontmatter(text, "mealie id", recipe.id);
+	{
+		const { head, body } = splitNote(text);
+		text = head + withCallout(body, today, conflicts);
+	}
+	writeNote(note.path, text);
+
+	// 2. The rating: Mealie keeps ratings per user (a recipe PATCH ignores
+	// `rating`; a recipe reads back with the signed-in user's own), so ⭐ is
+	// that user's rating, 0 clearing it. Only the rating is sent, so a
+	// favorite marked in Mealie stays.
+	if ("rating" in pushed && !config.dryRun) {
+		await api.post(`/users/${(await me(api)).id}/ratings/${recipe.id}`, { rating: pushed.rating ?? 0 });
+		myRatings?.set(recipe.id, pushed.rating ?? 0);
+	}
+
+	// 3. Mealie: the vault's winners, with the agreed hashes last of all.
+	const baseChanged = fp("_", nextBase) !== fp("_", base ?? {});
+	const bookkeeping = baseChanged || isNew || recipe.extras?.obsidian_note !== fileName || Object.keys(extras).length > 0;
+	let after = recipe;
+	if (Object.keys(patch).length || bookkeeping) {
+		patch.extras = { ...(recipe.extras ?? {}), ...extras, obsidian_note: fileName, [SYNC_EXTRA]: syncExtra(nextBase) };
+		if (!config.dryRun) after = await api.patch(`/recipes/${recipe.slug}`, patch);
+	}
+
+	// 4. Whatever Mealie stored differently from what was sent (a unit it
+	// spells its own way, a name it trims) comes back into the note now and
+	// is what both agree on, so the next run has nothing to do.
+	const normalized = {};
+	if (!config.dryRun && Object.keys(pushed).length) {
+		// Read it back fresh (a PATCH answer carries the all-users rating
+		// and may leave fields out). The rating is posted on its own and is
+		// per user, so it is not compared here.
+		after = await api.recipe(recipe.id);
+		for (const f of FIELDS) {
+			if (!(f.key in pushed) || f.key === "rating") continue;
+			const stored = f.mealie(after);
+			if (fp(f.key, stored) !== fp(f.key, pushed[f.key])) normalized[f.key] = stored;
+		}
+		if (Object.keys(normalized).length) {
+			writeNote(note.path, applyValues(text, normalized));
+			for (const [k, val] of Object.entries(normalized)) nextBase[k] = fp(k, val);
+			await api.patch(`/recipes/${after.slug}`, { extras: { ...(after.extras ?? recipe.extras ?? {}), [SYNC_EXTRA]: syncExtra(nextBase) } });
+		}
+	}
+
+	const parts = [];
+	if (Object.keys(pushed).length) parts.push(`→ Mealie: ${Object.keys(pushed).join(", ")}`);
+	if (Object.keys(pulled).length) parts.push(`→ vault: ${Object.keys(pulled).join(", ")}`);
+	if (Object.keys(normalized).length) parts.push(`(Mealie's spelling kept: ${Object.keys(normalized).join(", ")})`);
+	if (conflicts.length) parts.push(`CONFLICT: ${conflicts.map((c) => c.field).join(", ")}`);
+	if (!parts.length) parts.push(baseChanged ? "in sync (first sync recorded)" : "in sync");
+	say(note.name, `${config.dryRun ? "[dry] " : ""}${parts.join("; ")}`);
+	for (const c of conflicts) console.log(`      ${c.field}: vault ${c.vault} · Mealie ${c.mealie}`);
+	if (Object.keys(pushed).length) report.pushed++;
+	if (Object.keys(pulled).length) report.pulled++;
+	if (!Object.keys(pushed).length && !Object.keys(pulled).length && !conflicts.length) report.inSync++;
+	if (conflicts.length) report.conflicts++;
+}
+
+// ── The run ─────────────────────────────────────────────────────────────
+async function sync(vault, folder) {
+	const notes = loadNotes(folder);
+	const api = await Mealie.login(config.url, { tokenFile: config.tokenFile, baseWins: config.urlGiven });
+	const summaries = (await api.get("/recipes?perPage=-1")).items ?? [];
+	const skipped = (...keys) => keys.some((k) => k && config.skip.has(String(k).toLowerCase()));
+	console.log(`${notes.length} recipe note(s) in ${folder}; ${summaries.length} recipe(s) in Mealie (${api.base})${config.dryRun ? "  [dry run]" : ""}`);
+
+	// Pair notes with recipes: by `mealie id`, then (for a note with none) by name.
+	const byId = new Map(summaries.map((s) => [s.id, s]));
+	const byName = new Map(summaries.map((s) => [String(s.name).toLowerCase(), s]));
+	const idCount = new Map();
+	const idOf = (n) => {
+		const id = String(n.data["mealie id"] ?? "").trim();
+		return id === "creating" ? "" : id;
+	};
+	for (const n of notes) {
+		const id = idOf(n);
+		if (id) idCount.set(id, (idCount.get(id) ?? 0) + 1);
+	}
+	const claimed = new Set();
+	const pairs = [];
+	const fresh = [];
+	for (const n of notes) {
+		const id = idOf(n);
+		// A skipped note still claims its recipe (by id, or by name for a note
+		// without one): skipping means "leave this pair alone", not "this
+		// recipe has no note".
+		const rel = relative(folder, n.path).replace(/\\/g, "/");
+		if (skipped(n.name, id, rel, rel.replace(/\.md$/i, ""), n.fileName, n.fileName.replace(/\.md$/i, ""))) {
+			if (id) claimed.add(id);
+			else if (byName.has(n.name.toLowerCase())) claimed.add(byName.get(n.name.toLowerCase()).id);
 			continue;
 		}
-		const kv = /^([^:]+?):\s*(.*)$/.exec(line);
-		if (!kv) continue;
-		key = kv[1].trim();
-		const v = kv[2].trim();
-		if (v === "") data[key] = null;
-		else if (v.startsWith("[") && v.endsWith("]")) data[key] = v.slice(1, -1).split(",").map((s) => unquote(s.trim())).filter(Boolean);
-		else data[key] = unquote(v);
-	}
-	return { data, body: text.slice(m[0].length), raw: m[0] };
-}
-
-const unquote = (s) => s.replace(/^"(.*)"$/, "$1").replace(/^'(.*)'$/, "$1");
-const list = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
-const first = (v) => list(v)[0] ?? null;
-
-/** `## Heading` sections → { heading: text }, with the text before the first heading under "". */
-export function parseSections(body) {
-	const sections = {};
-	let current = "";
-	for (const line of body.split(/\r?\n/)) {
-		const h = /^##\s+(.+?)\s*$/.exec(line);
-		if (h) {
-			current = h[1].toLowerCase();
-			sections[current] = sections[current] ?? [];
+		if (id) claimed.add(id);
+		if (id && idCount.get(id) > 1) {
+			say(n.name, `ERROR: ${idCount.get(id)} notes share mealie id ${id}; give one of them another id or none`);
+			report.errors++;
 			continue;
 		}
-		(sections[current] = sections[current] ?? []).push(line);
+		if (id) {
+			pairs.push({ note: n, id, gone: !byId.has(id) });
+			continue;
+		}
+		const match = byName.get(n.name.toLowerCase());
+		const creatingNote = String(n.data["mealie id"] ?? "").trim() === "creating";
+		if (match && !claimed.has(match.id) && !idCount.has(match.id)) {
+			claimed.add(match.id);
+			pairs.push({ note: n, id: match.id, linked: true, creatingNote });
+		} else fresh.push(n);
 	}
-	for (const k of Object.keys(sections)) sections[k] = sections[k].join("\n").trim();
-	return sections;
-}
 
-const bullets = (text) =>
-	(text ?? "")
-		.split(/\r?\n/)
-		.map((l) => l.replace(/^\s*(?:[-*]|\d+[.)])\s+/, "").trim())
-		.filter((l) => l && l !== "-");
+	// Recipes the vault's ids point at but Mealie does not have. A few is a
+	// deletion; most of them means the wrong Mealie (another instance, or a
+	// token for another group), and archiving would be wrong.
+	// A note already marked Archived is settled and does not count.
+	const isArchived = (n) => /archived/i.test(String(n.data.status ?? ""));
+	const gone = [];
+	for (const p of pairs.filter((x) => x.gone)) {
+		if (await api.recipe(p.id)) p.gone = false;
+		else if (!isArchived(p.note)) gone.push(p);
+	}
+	const withIds = pairs.filter((p) => !p.linked && !(p.gone && isArchived(p.note))).length;
+	// Most of the vault's recipes missing, or every one of them: that is not
+	// deletions, it is the wrong Mealie (another instance, a token for
+	// another group). Writing anything there would be wrong, so stop.
+	const suspicious = gone.length > 0 && (gone.length === withIds || (gone.length > 1 && gone.length * 2 >= withIds));
+	if (suspicious && !config.allowArchive) {
+		console.error(
+			`  ! ${gone.length} of ${withIds} notes point at recipes ${api.base} does not have: the wrong Mealie? Nothing written (pass --allow-archive if they really were deleted).`,
+		);
+		report.errors++;
+		return 1;
+	}
 
-export async function readNote(path) {
-	const text = await readFile(path, "utf8");
-	const { data, body, raw } = parseFrontmatter(text);
-	const sections = parseSections(body);
-	const h1 = /^#\s+(.+?)\s*$/m.exec(body)?.[1];
-	return {
-		path,
-		text,
-		raw,
-		data,
-		sections,
-		name: h1 ?? basename(path, ".md"),
-		isRecipe: list(data["base type"]).some((t) => /recipe/i.test(t)),
-	};
-}
-
-// ── Note → Mealie ───────────────────────────────────────────────────────
-export function noteToJsonLd(note) {
-	const d = note.data;
-	const source = d.source ?? undefined;
-	// The site's sync reads the first tag that isn't WhatsFine as the page's
-	// kicker chip, so "Recipe" goes first and cuisines follow.
-	const keywords = ["Recipe", ...list(d.cuisine)];
-	if (source && /whatsfine\.com/i.test(source)) keywords.unshift(SOURCE_TAG);
-	return compact({
-		"@context": "https://schema.org",
-		"@type": "Recipe",
-		name: note.name,
-		description: tagline(note),
-		url: source,
-		recipeYield: d.yield ?? (d.servings ? `Serves ${d.servings}` : undefined),
-		prepTime: isoDuration(d["prep time"]),
-		cookTime: isoDuration(d["cook time"]),
-		totalTime: isoDuration(d["total time"]),
-		recipeIngredient: bullets(note.sections.ingredients),
-		recipeInstructions: bullets(note.sections.instructions).map((text) => ({ "@type": "HowToStep", text })),
-		recipeCategory: list(d["recipe type"]),
-		keywords: keywords.join(", "),
-	});
-}
-
-const tagline = (note) => (note.sections["image and tagline"] ?? "").split(/\n\s*\n/)[0]?.replace(/^!\[\[.*?\]\]\s*/, "").trim();
-
-/** Everything schema.org has no slot for; organizers are resolved to objects by the caller. */
-export function noteToPatch(note, { tools = [], categories = [], tags = [] } = {}) {
-	const d = note.data;
-	// "Immediate Thoughts" stays in the vault: it is drafting scratch, and
-	// every Mealie note on a WhatsFine recipe is published to /food by the
-	// site's sync (whatsfine/docs/mealie-sync.md).
-	const notes = [];
-	const noteLines = bullets(note.sections.notes);
-	if (noteLines.length) notes.push({ title: "Notes", text: noteLines.map((l) => `- ${l}`).join("\n") });
-
-	const article = /whatsfine\.com\/articles\/([^/?#]+)/i.exec(d.source ?? "")?.[1];
-	return compact({
-		notes,
-		tools,
-		recipeCategory: categories,
-		tags,
-		extras: compact({
-			obsidian_note: basename(note.path),
-			obsidian_status: first(d.status) ?? undefined,
-			obsidian_rating: first(d["⭐"]) ?? undefined,
-			recommended_by: list(d["recommended by"]).join(", "),
-			...(article ? { whatsfine_article: article } : {}),
-		}),
-	});
-}
-
-/** For updating a recipe Mealie already has, without re-importing it. */
-export function noteToUpdate(note, organizers) {
-	const d = note.data;
-	const patch = noteToPatch(note, organizers);
-	return compact({
-		...patch,
-		description: tagline(note),
-		recipeYield: d.yield ?? "",
-		prepTimeSeconds: durationSeconds(d["prep time"]),
-		cookTimeSeconds: durationSeconds(d["cook time"]),
-		totalTimeSeconds: durationSeconds(d["total time"]),
-		orgURL: d.source ?? undefined,
-		recipeInstructions: bullets(note.sections.instructions).map((text) => ({ text })),
-		recipeIngredient: bullets(note.sections.ingredients).map((line) => ({ note: line, originalText: line })),
-	});
-}
-
-/** Replace (or add) the `mealie id` line in the note's frontmatter, leaving everything else as it is. */
-export function withMealieId(text, id) {
-	if (/^mealie id:.*$/m.test(text)) return text.replace(/^mealie id:.*$/m, `mealie id: ${id}`);
-	return text.replace(/^---\r?\n([\s\S]*?)(\r?\n---)/, (m, fm, end) => `---\n${fm}\nmealie id: ${id}${end}`);
-}
-
-// ── Mealie → note ───────────────────────────────────────────────────────
-export function recipeToNote(recipe, template) {
-	const fm = {
-		"recipe type": (recipe.recipeCategory ?? []).map((c) => c.name),
-		status: ["Draft"],
-		created: new Date().toISOString().slice(0, 10),
-		source: recipe.orgURL ?? "",
-		yield: recipe.recipeYield || (recipe.recipeServings ? `Serves ${trimNum(recipe.recipeServings)}` : ""),
-		servings: recipe.recipeServings ? trimNum(recipe.recipeServings) : "",
-		"prep time": minutes(recipe.prepTimeSeconds),
-		"cook time": minutes(recipe.cookTimeSeconds),
-		"total time": minutes(recipe.totalTimeSeconds),
-		cuisine: (recipe.tags ?? []).map((t) => t.name).filter((n) => n !== SOURCE_TAG),
-		tools: (recipe.tools ?? []).map((t) => t.name),
-		"mealie id": recipe.id,
-	};
-	// Fill the template's frontmatter line by line so the property order and
-	// the ones we don't touch (tags, base type, ⭐, recommended by) survive.
-	let text = template.replace(/^---\r?\n([\s\S]*?)\r?\n---/, (m, body) => {
-		const lines = body.split(/\r?\n/);
-		const out = [];
-		let skipList = false;
-		for (const line of lines) {
-			if (skipList && /^\s+-/.test(line)) continue;
-			skipList = false;
-			const kv = /^([^:]+?):\s*(.*)$/.exec(line);
-			const key = kv?.[1].trim();
-			if (key && key in fm) {
-				const v = fm[key];
-				if (Array.isArray(v)) {
-					out.push(`${key}:`);
-					for (const item of v) out.push(`  - ${item}`);
-					skipList = true;
-				} else out.push(`${key}: ${v ?? ""}`);
+	for (const p of pairs) {
+		try {
+			if (p.gone) {
+				// Deleted in Mealie: the note says so (its other statuses kept),
+				// and nothing is re-created.
+				if (isArchived(p.note)) continue;
+				const statuses = (Array.isArray(p.note.data.status) ? p.note.data.status : [p.note.data.status]).filter(Boolean);
+				writeNote(p.note.path, setFrontmatter(p.note.text, "status", [...statuses, "Archived"]));
+				report.archived++;
+				say(p.note.name, `${config.dryRun ? "[dry] " : ""}deleted in Mealie: note marked Archived, not re-created`);
 				continue;
 			}
-			out.push(line);
+			const recipe = await api.recipe(p.id);
+			if (skipped(recipe.slug)) continue;
+			if (p.linked) say(p.note.name, `linked by name to Mealie recipe ${recipe.slug}`);
+			await syncPair(api, p.note, recipe, { creatingNote: p.creatingNote });
+		} catch (e) {
+			report.errors++;
+			say(p.note.name, `ERROR: ${e.message}`);
 		}
-		return `---\n${out.join("\n")}\n---`;
-	});
-
-	const ingredients = (recipe.recipeIngredient ?? []).map((i) => `- ${ingredientText(i)}`).join("\n");
-	const steps = (recipe.recipeInstructions ?? []).map((s, n) => `${n + 1}. ${s.text}`).join("\n");
-	const notes = (recipe.notes ?? []).map((n) => `- **${n.title}**: ${n.text.replace(/\n/g, " ")}`).join("\n");
-	text = text
-		.replace(/## Ingredients\r?\n-\s*\r?\n?/, `## Ingredients\n${ingredients}\n`)
-		.replace(/## Instructions\r?\n1\.\s*\r?\n?/, `## Instructions\n${steps}\n`)
-		.replace(/## Notes\r?\n/, `## Notes\n${notes}${notes ? "\n" : ""}`)
-		.replace(/## Image and Tagline\r?\n?/, `## Image and Tagline\n${recipe.description ?? ""}\n`);
-	return text;
-}
-
-const trimNum = (n) => String(Number(n)).replace(/\.0+$/, "");
-const minutes = (s) => (s ? `${Math.round(s / 60)} minutes` : "");
-function ingredientText(i) {
-	if (i.display) return i.display;
-	if (i.food?.name) return [trimNum(i.quantity || ""), i.unit?.name, i.food.name, i.note].filter(Boolean).join(" ");
-	return i.note ?? i.originalText ?? "";
-}
-
-// ── Commands ────────────────────────────────────────────────────────────
-async function loadNotes(folder) {
-	const files = (await readdir(folder)).filter((f) => f.endsWith(".md"));
-	const notes = await Promise.all(files.map((f) => readNote(join(folder, f))));
-	return notes.filter((n) => n.isRecipe);
-}
-
-async function push(folder) {
-	const notes = await loadNotes(folder);
-	console.log(`${notes.length} recipe note(s) in ${folder}`);
-	if (config.dryRun) {
-		await mkdir(config.outDir, { recursive: true });
-		for (const n of notes) {
-			const base = join(config.outDir, slugify(n.name));
-			await writeFile(`${base}.jsonld.json`, JSON.stringify(noteToJsonLd(n), null, 2));
-			await writeFile(`${base}.patch.json`, JSON.stringify(noteToPatch(n), null, 2));
-			console.log(`  ${basename(n.path)} → ${base}.{jsonld,patch}.json`);
-		}
-		return;
 	}
 
-	const api = await Mealie.login(config.url);
-	const me = await api.get("/users/self");
-	console.log(`signed in as ${me.email} (group ${me.groupSlug ?? me.group}, household ${me.household})`);
-	const byName = await api.recipesByName();
-
-	for (const note of notes) {
-		const d = note.data;
-		const ld = noteToJsonLd(note);
-		const organizers = {
-			tools: await api.ensureTools(list(d.tools)),
-			categories: await api.ensureCategories(list(d["recipe type"])),
-			tags: await api.ensureTags(ld.keywords ? ld.keywords.split(", ") : []),
-		};
-
-		let existing = d["mealie id"] ? await api.recipe(d["mealie id"]) : null;
-		existing ??= byName.get(note.name.toLowerCase()) ?? null;
-		if (existing && config.replace) {
-			await api.delete(`/recipes/${existing.slug}`);
-			existing = null;
+	// Notes with no recipe yet: create it in Mealie, the vault's version wins.
+	// The recipe is marked as being created and the note gets its id first,
+	// so a run that fails halfway is finished, not misread, by the next one.
+	for (const n of fresh) {
+		if (!config.create) {
+			say(n.name, "no Mealie recipe (left alone: --no-create)");
+			continue;
 		}
-
-		let slug;
-		let action;
-		if (existing) {
-			// The note owns the recipe text; Mealie keeps what the note has no
-			// section for (seed.mjs's "Printable card" note, other extras).
-			const full = await api.recipe(existing.slug);
-			const update = noteToUpdate(note, organizers);
-			const ours = new Set((update.notes ?? []).map((n) => n.title));
-			update.notes = [...(update.notes ?? []), ...(full.notes ?? []).filter((n) => !ours.has(n.title))];
-			update.extras = { ...(full.extras ?? {}), ...(update.extras ?? {}) };
-			if (config.parse) update.recipeIngredient = await api.parseIngredients(ld.recipeIngredient);
-			await api.patch(`/recipes/${existing.slug}`, update);
-			slug = existing.slug;
-			action = "updated";
-		} else {
-			slug = await api.importJsonLd(ld);
-			const patch = noteToPatch(note, organizers);
-			if (config.parse) patch.recipeIngredient = await api.parseIngredients(ld.recipeIngredient);
-			await api.patch(`/recipes/${slug}`, patch);
-			action = "created";
+		try {
+			if (config.dryRun) {
+				say(n.name, "[dry] would create the recipe in Mealie");
+				report.created++;
+				continue;
+			}
+			// The note says "creating" before the recipe exists, so a run that
+			// dies between the two leaves a trail the next run follows.
+			writeNote(n.path, setFrontmatter(n.text, "mealie id", "creating"));
+			const slug = await api.post("/recipes", { name: n.name });
+			let recipe = await api.recipe(slug);
+			recipe = await api.patch(`/recipes/${slug}`, {
+				extras: { ...(recipe.extras ?? {}), obsidian_note: basename(n.path), [SYNC_EXTRA]: JSON.stringify({ v: 1, creating: true, fields: {} }) },
+			});
+			const text = setFrontmatter(n.text, "mealie id", recipe.id);
+			writeNote(n.path, text);
+			say(n.name, `created in Mealie as ${slug}`);
+			report.created++;
+			await syncPair(api, { ...readNoteText(text, n.fileName), path: n.path }, recipe);
+		} catch (e) {
+			report.errors++;
+			say(n.name, `ERROR: ${e.message}`);
 		}
-
-		const recipe = await api.recipe(slug);
-		if (config.writeBack && d["mealie id"] !== recipe.id) {
-			await writeFile(note.path, withMealieId(note.text, recipe.id));
-			action += ", id written back";
-		}
-		console.log(`  ${action.padEnd(22)} ${slug}  (${basename(note.path)})`);
 	}
+
+	// Recipes no note knows: write a note for each, Mealie's version. One whose
+	// note existed (extras.obsidian_note) but is not in the folder any more is
+	// reported instead: re-creating it would undo a delete or a move.
+	let template;
+	for (const s of summaries) {
+		if (claimed.has(s.id) || skipped(s.slug, s.id, s.name) || !config.newNotes) continue;
+		try {
+			const recipe = await api.recipe(s.slug);
+			const had = recipe.extras?.obsidian_note;
+			if (had && !config.restoreNotes) {
+				say(recipe.name, `note "${had}" is not in ${basename(folder)} (moved out, renamed or deleted?); not re-created (--restore-notes writes it again)`);
+				continue;
+			}
+			template ??= readFileSync(join(vault, config.template), "utf8");
+			const path = join(folder, `${recipe.name.replace(/[\\/:*?"<>|#^[\]]/g, "-").trim()}.md`);
+			if (existsSync(path)) {
+				say(recipe.name, `ERROR: ${basename(path)} exists but is not linked to ${recipe.slug}; set its mealie id`);
+				report.errors++;
+				continue;
+			}
+			const values = Object.fromEntries(FIELDS.map((f) => [f.key, f.mealie(recipe)]));
+			let text = applyValues(setFrontmatter(template, "created", today), values);
+			text = setFrontmatter(text, "mealie id", recipe.id);
+			writeNote(path, text, { create: true });
+			if (!config.dryRun) {
+				const fields = Object.fromEntries(FIELDS.map((f) => [f.key, fp(f.key, f.mealie(recipe))]));
+				await api.patch(`/recipes/${recipe.slug}`, { extras: { ...(recipe.extras ?? {}), obsidian_note: basename(path), [SYNC_EXTRA]: syncExtra(fields) } });
+			}
+			say(recipe.name, `${config.dryRun ? "[dry] would write" : "wrote"} a new note, ${basename(path)}`);
+			report.newNotes++;
+		} catch (e) {
+			report.errors++;
+			say(s.name, `ERROR: ${e.message}`);
+		}
+	}
+
+	const r = report;
+	console.log(
+		`done${config.dryRun ? " (dry run)" : ""}: ${r.inSync} in sync, ${r.pushed} to Mealie, ${r.pulled} to the vault, ${r.created} created in Mealie, ${r.newNotes} new note(s), ${r.archived} archived, ${r.conflicts} conflict(s), ${r.errors} error(s)`,
+	);
+	return r.errors || r.conflicts ? 1 : 0;
 }
 
-async function pull(vault, folder) {
-	const api = await Mealie.login(config.url);
-	const template = await readFile(join(vault, config.template), "utf8");
-	const notes = await loadNotes(folder);
-	const known = new Set(notes.map((n) => n.data["mealie id"]).filter(Boolean));
-	const knownNames = new Set(notes.map((n) => n.name.toLowerCase()));
-	const page = await api.get("/recipes?perPage=-1");
-	let created = 0;
-	for (const summary of page.items ?? []) {
-		if (known.has(summary.id) || knownNames.has(String(summary.name).toLowerCase())) continue;
-		const recipe = await api.recipe(summary.slug);
-		const file = join(folder, `${recipe.name.replace(/[\\/:*?"<>|]/g, "-")}.md`);
-		if (config.dryRun) {
-			console.log(`  would create ${basename(file)}`);
-		} else {
-			await writeFile(file, recipeToNote(recipe, template), { flag: "wx" });
-			console.log(`  created ${basename(file)}`);
+/** One run at a time: a scheduled sync must not overlap a manual one. The
+ *  lock records its process and start; a lock whose process is gone, or that
+ *  is over an hour old, was left by a crash and is taken over. */
+async function withLock(fn) {
+	const lock = join(tmpdir(), "whatsfine-obsidian-sync.lock");
+	const alive = (pid) => {
+		try {
+			process.kill(pid, 0);
+			return true;
+		} catch (e) {
+			return e.code === "EPERM";
 		}
-		created++;
+	};
+	if (existsSync(lock)) {
+		let held = null;
+		try {
+			held = JSON.parse(readFileSync(lock, "utf8"));
+		} catch {
+			// unreadable (or the old directory lock): stale
+		}
+		const live = held && Date.now() - Date.parse(held.at) < 60 * 60 * 1000 && alive(held.pid);
+		if (live) {
+			console.error(`Another sync is running (pid ${held.pid}, since ${held.at}).`);
+			return 1;
+		}
+		// Take the stale lock over by renaming it away: only one run's rename
+		// can succeed, so two runs cannot both take it.
+		const away = `${lock}.stale-${process.pid}`;
+		try {
+			renameSync(lock, away);
+		} catch {
+			console.error("Another sync took the lock just now.");
+			return 1;
+		}
+		rmSync(away, { recursive: true, force: true });
 	}
-	console.log(`${created} note(s) ${config.dryRun ? "would be " : ""}created in ${folder}`);
+	try {
+		writeFileSync(lock, JSON.stringify({ pid: process.pid, at: new Date().toISOString() }), { flag: "wx" });
+	} catch {
+		console.error("Another sync started at the same moment.");
+		return 1;
+	}
+	const release = () => rmSync(lock, { force: true });
+	const onSignal = (sig) => {
+		release();
+		process.exit(sig === "SIGINT" ? 130 : 143);
+	};
+	process.once("SIGINT", onSignal);
+	process.once("SIGTERM", onSignal);
+	try {
+		return await fn();
+	} finally {
+		release();
+	}
 }
 
 async function main() {
-	if (!["push", "pull"].includes(command)) {
-		console.error("usage: node obsidian.mjs <push|pull> [options]");
-		process.exit(2);
+	if (command === "push" || command === "pull") {
+		console.error(`"${command}" is now "sync": one command that goes both ways. See the header of seed/obsidian.mjs.`);
+		return 2;
 	}
-	const vault = await findVault();
+	if (command !== "sync") {
+		console.error("usage: node obsidian.mjs sync [--dry-run] [options]");
+		return 2;
+	}
+	if (config.prefer && !["vault", "mealie"].includes(config.prefer)) {
+		console.error("--prefer takes vault or mealie");
+		return 2;
+	}
+	const vault = findVault();
 	const folder = join(vault, config.folder);
 	console.log(`vault: ${vault}`);
-	if (command === "push") await push(folder);
-	else await pull(vault, folder);
+	return withLock(() => sync(vault, folder));
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-	main().catch((e) => {
-		console.error(e.message ?? e);
-		process.exit(1);
-	});
+	main().then(
+		(code) => (process.exitCode = code),
+		(e) => {
+			console.error(e.message ?? e);
+			process.exitCode = 1;
+		},
+	);
 }

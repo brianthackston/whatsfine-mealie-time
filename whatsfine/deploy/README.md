@@ -27,7 +27,7 @@ Then open `http://<box>:9925`, sign in with upstream's default admin
 ```bash
 cd ../            # whatsfine/
 MEALIE_URL=http://<box>:9925 MEALIE_USER=... MEALIE_PASSWORD=... pnpm seed -- --seed-foods
-MEALIE_URL=http://<box>:9925 MEALIE_USER=... MEALIE_PASSWORD=... pnpm obsidian:push
+MEALIE_URL=http://<box>:9925 MEALIE_USER=... MEALIE_PASSWORD=... pnpm obsidian:sync
 ```
 
 (`--seed-foods` once per group; it loads Mealie's en-US foods and units so
@@ -49,10 +49,12 @@ user API token>" }`) plus an `emdash-local.json` with a site PAT:
 */15 * * * *  cd ~/whatsfine && pnpm run mealie:sync >> ~/mealie-sync.log 2>&1
 ```
 
-`pnpm obsidian:pull` (notes for recipes typed straight into Mealie) wants
-the Obsidian vault on the same machine, so unless the vault syncs to the
-box, run it from the PC that has the vault, pointed at the box:
-`MEALIE_URL=http://<box>:9925 MEALIE_TOKEN=… pnpm obsidian:pull`.
+`pnpm obsidian:sync` (the vault and Mealie, both ways) wants the Obsidian
+vault on the same machine, so unless the vault syncs to the box, run it
+from the PC that has the vault, pointed at the box:
+`MEALIE_URL=http://<box>:9925 pnpm obsidian:sync`, with the token in
+`whatsfine/mealie-local.json` (`{ "url", "token" }`, gitignored) so a
+scheduled run can sign in.
 
 ## Reaching it from outside: Cloudflare Tunnel + Access
 

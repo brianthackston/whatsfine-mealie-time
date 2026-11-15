@@ -143,6 +143,31 @@ Since then, whatsfine.com, Mealie and the vault agree on these recipes.
 
 ### Stage 3: an Obsidian ↔ Mealie sync that can stay in sync (this fork)
 
+**Done 2026-11-15.** `pnpm obsidian:sync` (`seed/obsidian.mjs`, with
+`seed/lib/contract.mjs` and `seed/lib/note.mjs`) replaces push and pull. It
+is built as planned below, and two independent review rounds pushed it
+further:
+
+- **Write order and dry runs.** Writes go note first, then Mealie, with the
+  agreed hashes last, and `--dry-run` writes nothing anywhere.
+- **Merged lists.** An edited ingredient keeps its section title and the ID
+  steps link to, and new lines get a stable ID. Mealie invents a fresh ID on
+  every read for a row stored without one.
+- **Obsidian-only content stays put.** Comments, embeds, sub-headings and
+  nested items never reach Mealie, and keep their place when lists change.
+- **Ratings.** ⭐ is your own Mealie rating, not the all-users average.
+- **Guards.** A run against the wrong Mealie stops without writing. A crash
+  during a create is finished by the next run. A stale lock is taken over.
+
+On the real vault, the first run added `whatsfine: true` to the three
+WhatsFine notes and created Kielbasa Stuffing in Mealie, off the site. The
+second run found all four in sync. Brown butter was skipped (Decision 3).
+There are 44 tests (`pnpm test`). The site sync now leaves an article alone
+when Mealie changed nothing it shows, so this sync's bookkeeping causes no
+article rewrites.
+
+The plan as written before the work:
+
 `seed/obsidian.mjs` today pushes unconditionally and pulls only new notes.
 Replace push and pull with one `sync` command built on a contract:
 

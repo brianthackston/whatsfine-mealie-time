@@ -180,7 +180,7 @@ async function main() {
 		console.log("seeded foods and units (en-US)");
 	}
 
-	await api.ensureTags([SOURCE_TAG]);
+	await api.ensureTags([SOURCE_TAG], { repair: [SOURCE_TAG] });
 	const existingByName = await api.recipesByName();
 
 	for (const a of articles) {
